@@ -327,6 +327,8 @@ header{
       <span id="statusText">Starting camera…</span>
     </div>
     <div class="controls">
+      <button class="ctrl-btn" id="accountBtn">☁ Log in</button>
+      <button class="ctrl-btn" id="historyBtn">📋 History</button>
       <button class="ctrl-btn" id="themeBtn">🌙 Dark</button>
       <button class="ctrl-btn" id="textBtn">A+ Text</button>
     </div>
@@ -425,6 +427,84 @@ header{
 
 <script>
 'use strict';
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPABASE CLOUD SYNC  (accounts + saved workout history)
+// 1. Create a project at supabase.com → Project Settings → API.
+// 2. Paste the Project URL and the anon public key below.
+//    (The anon key is meant to be public; data is protected by Row Level Security.)
+// 3. Run the SQL from the README in the Supabase SQL editor to create the table.
+// ─────────────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://taitffaszutpafdpywwl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhaXRmZmFzenV0cGFmZHB5d3dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NzEwNTMsImV4cCI6MjA5ODE0NzA1M30.LOBMuYDLO0uenEGuUViCqanH0cv6au7uvXTM05iiwzY';
+let sb = null, sbUser = null;
+const cloudConfigured = () => /^https:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
+
+async function cloudInit(){
+  if (!cloudConfigured()){ updateAccountUI(); return; }
+  try {
+    const mod = await import('https://esm.sh/@supabase/supabase-js@2');
+    sb = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data:{ session } } = await sb.auth.getSession();
+    sbUser = session ? session.user : null;
+    sb.auth.onAuthStateChange((_e, s) => { sbUser = s ? s.user : null; updateAccountUI(); });
+  } catch(e){ console.error('Supabase init failed:', e); }
+  updateAccountUI();
+}
+
+function updateAccountUI(){
+  const btn = document.getElementById('accountBtn');
+  if (!btn) return;
+  if (!cloudConfigured()){ btn.textContent = '☁ Cloud off'; btn.title = 'Add your Supabase URL + anon key in the code to enable cloud save'; return; }
+  btn.textContent = sbUser ? ('☁ ' + (sbUser.email || 'Account')) : '☁ Log in';
+  btn.title = sbUser ? 'Click to log out' : 'Log in to save your workouts';
+}
+
+async function cloudLogin(){
+  if (!cloudConfigured()){ alert('Cloud save isn’t set up yet.\n\nAdd your Supabase project URL and anon key near the top of the script, then run the SQL from the README.'); return; }
+  if (sbUser){ if (confirm('Log out of ' + sbUser.email + '?')) await sb.auth.signOut(); return; }
+  const email = (prompt('Enter your email to get a magic sign-in link:') || '').trim();
+  if (!email) return;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] } });
+  alert(error ? ('Sign-in error: ' + error.message) : 'Check your email for a sign-in link, then return to this page.');
+}
+
+async function cloudSave(){
+  if (!cloudConfigured()){ cloudLogin(); return; }
+  if (!sbUser){ alert('Log in first (top-right ☁ button) to save your workout.'); return; }
+  const d = buildReportData();
+  if (!d.hasData){ alert('No completed reps to save yet.'); return; }
+  const rows = d.movements.map(m => ({
+    movement: m.name, avg_score: m.avg, reps: m.reps,
+    best: m.best || 0, hold_s: Math.round(m.bestHold || 0), is_hold: !!m.isHold
+  }));
+  const btn = document.getElementById('btnSaveCloud'); if (btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  const { error } = await sb.from('sessions').insert(rows);
+  if (btn){ btn.disabled = false; btn.textContent = error ? '☁ Retry save' : '✓ Saved'; }
+  if (error) alert('Save failed: ' + error.message);
+}
+
+async function cloudHistory(){
+  if (!cloudConfigured()){ cloudLogin(); return; }
+  if (!sbUser){ alert('Log in first (top-right ☁ button) to view your history.'); return; }
+  const overlay = document.getElementById('guideOverlay');
+  const show = inner => {
+    overlay.innerHTML = `<div class="modal"><div class="modal-top"><div class="modal-title">📋 Workout History</div><button class="modal-close" id="histClose">✕</button></div>${inner}</div>`;
+    overlay.hidden = false;
+    document.getElementById('histClose').addEventListener('click', () => { overlay.hidden = true; });
+    overlay.onclick = e => { if (e.target === overlay) overlay.hidden = true; };
+  };
+  show('<div class="rc-empty">Loading…</div>');
+  const { data, error } = await sb.from('sessions').select('*').order('created_at', { ascending:false }).limit(100);
+  if (error){ show(`<div class="rc-empty">Couldn’t load history: ${error.message}</div>`); return; }
+  if (!data.length){ show('<div class="rc-empty">No saved workouts yet. Finish a workout and tap “☁ Save workout”.</div>'); return; }
+  const rows = data.map(r => {
+    const when = new Date(r.created_at).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+    const detail = r.is_hold ? `${r.hold_s}s hold` : `${r.reps} reps · best ${r.best || '—'}`;
+    return `<div class="mv-row"><div style="flex:1;min-width:0"><div class="mv-name">${r.movement}</div><div class="mv-detail">${detail} · ${when}</div></div><div class="mv-score" style="color:${scoreColor(r.avg_score)}">${r.avg_score}</div></div>`;
+  }).join('');
+  show(rows);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LANDMARK INDICES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2009,6 +2089,7 @@ function renderReport(){
     </div>
 
     <div class="report-actions">
+      <button class="btn btn-ghost" id="btnSaveCloud">☁ Save workout</button>
       <button class="btn btn-ghost" id="btnNew">Start New Session</button>
       <button class="btn btn-primary" id="btnResume">Resume Session</button>
     </div>
@@ -2020,6 +2101,7 @@ function wireReportButtons(){
   const c = document.getElementById('btnCloseReport'); if (c) c.addEventListener('click', closeReport);
   const r = document.getElementById('btnResume');      if (r) r.addEventListener('click', closeReport);
   const n = document.getElementById('btnNew');         if (n) n.addEventListener('click', newSession);
+  const s = document.getElementById('btnSaveCloud');   if (s) s.addEventListener('click', cloudSave);
 }
 
 function openReport(){
@@ -2719,6 +2801,11 @@ async function initApp() {
   document.getElementById('textBtn').addEventListener('click', () => {
     applyText(!document.documentElement.classList.contains('large-text'));
   });
+
+  // Cloud sync (Supabase): account + history
+  document.getElementById('accountBtn').addEventListener('click', cloudLogin);
+  document.getElementById('historyBtn').addEventListener('click', cloudHistory);
+  cloudInit();
 
   // Reset session stats for the current movement
   document.getElementById('resetStats').addEventListener('click', () => {
