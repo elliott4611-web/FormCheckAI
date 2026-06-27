@@ -1,0 +1,2808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FormCheck — AI Workout Form Analyzer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--card:#16161f;--accent:#00e87a;--accent2:#00b85f;
+  --text:#f0f0ff;--muted:#6666aa;--danger:#ff4455;--warn:#ffaa00;--ok:#00e87a;
+  --border:#22223a;--r:14px;--hover:rgba(255,255,255,.045);
+}
+:root[data-theme="light"]{
+  --bg:#eceef4;--bg2:#ffffff;--card:#ffffff;--accent:#00a85a;--accent2:#018048;
+  --text:#181826;--muted:#76768f;--danger:#e22a44;--warn:#cf7a00;--ok:#00a85a;
+  --border:#d7dae6;--hover:rgba(0,0,0,.04);
+}
+html{font-size:16px}
+html.large-text{font-size:19px}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;transition:background .25s,color .25s}
+
+/* ── Header ── */
+header{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:.75rem 1.5rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0;
+}
+.logo{font-size:1.35rem;font-weight:900;letter-spacing:-.5px;color:var(--accent)}
+.logo span{color:var(--text)}
+.tagline{color:var(--muted);font-size:.8rem}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;justify-content:flex-end}
+.status-bar{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);transition:background .4s}
+.status-dot.on{background:var(--accent)}
+.controls{display:flex;align-items:center;gap:.4rem}
+.ctrl-btn{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.32rem .6rem;font-size:.72rem;cursor:pointer;
+  font-family:inherit;transition:all .18s;white-space:nowrap;
+}
+.ctrl-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ctrl-btn.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+
+/* ── Layout ── */
+.layout{
+  display:grid;grid-template-columns:232px 1fr 344px;gap:1rem;
+  padding:1rem;flex:1;min-height:0;overflow:hidden;
+}
+.main{display:flex;flex-direction:column;gap:.75rem;min-height:0}
+.right{display:flex;flex-direction:column;gap:.75rem;overflow-y:auto;padding-right:2px}
+
+/* ── Sidebar nav ── */
+.sidebar{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;
+}
+.search-wrap{padding:.7rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-box{
+  width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);
+  border-radius:9px;padding:.5rem .7rem;font-size:.82rem;font-family:inherit;outline:none;
+  transition:border-color .18s;
+}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--muted)}
+.nav{overflow-y:auto;padding:.45rem;flex:1;min-height:0}
+.nav-group{margin-bottom:.3rem}
+.nav-group[hidden]{display:none}
+.nav-head{
+  display:flex;align-items:center;gap:.4rem;width:100%;background:transparent;border:0;
+  color:var(--muted);font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;
+  padding:.45rem .5rem .3rem;cursor:pointer;font-family:inherit;
+}
+.nav-head .chev{transition:transform .2s;font-size:.6rem}
+.cat-ic{font-size:1.5rem;line-height:1}
+.nav-group.collapsed .chev{transform:rotate(-90deg)}
+.nav-group.collapsed .nav-list{display:none}
+.nav-count{margin-left:auto;opacity:.65}
+.nav-list{display:flex;flex-direction:column;gap:1px}
+.nav-item{
+  display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;
+  background:transparent;border:0;border-radius:9px;color:var(--text);
+  padding:.5rem .55rem;cursor:pointer;font-family:inherit;font-size:.86rem;
+  transition:background .14s;
+}
+.nav-item[hidden]{display:none}
+.nav-item:hover{background:var(--hover)}
+.nav-item.active{background:var(--accent);color:#000;font-weight:700}
+.nav-item .ic{font-size:1rem;width:1.35rem;text-align:center;flex-shrink:0}
+.nav-item .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item .vc{font-size:.62rem;opacity:.55}
+.nav-item.active .vc{opacity:.8}
+.nav-empty{color:var(--muted);font-size:.78rem;padding:.7rem .5rem;text-align:center}
+/* sub-categories inside the Gym group */
+.nav-sub{margin:.05rem 0}
+.nav-sub[hidden]{display:none}
+.sub-head{
+  display:flex;align-items:center;gap:.35rem;width:100%;background:transparent;border:0;
+  color:var(--muted);font-size:.62rem;letter-spacing:.5px;text-transform:uppercase;
+  padding:.35rem .5rem .25rem .9rem;cursor:pointer;font-family:inherit;opacity:.85;
+}
+.sub-head:hover{color:var(--text)}
+.sub-head.static{cursor:default;padding-left:.6rem}
+.sub-head.static:hover{color:var(--muted)}
+.sub-head .chev{font-size:.5rem;transition:transform .2s}
+.nav-sub.collapsed .chev{transform:rotate(-90deg)}
+.nav-sub.collapsed .sub-list{display:none}
+.sub-list{display:flex;flex-direction:column;gap:1px}
+.sub-list .nav-item{padding-left:1.05rem}
+.kbd-hint{flex-shrink:0;border-top:1px solid var(--border);padding:.5rem .7rem;color:var(--muted);font-size:.64rem}
+.kbd-hint b{color:var(--text);background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 .3rem;font-weight:600;margin:0 .05rem}
+
+/* ── Movement bar (above video) ── */
+.movement-bar{
+  display:flex;align-items:center;gap:.5rem;background:var(--card);
+  border:1px solid var(--border);border-radius:var(--r);padding:.55rem .85rem;flex-shrink:0;flex-wrap:wrap;
+}
+.crumb{font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:.45rem;min-width:0}
+.crumb .ic{font-size:1.1rem}
+.crumb .sep{color:var(--muted);font-weight:400}
+.crumb .cat{color:var(--muted);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:1px}
+.guide-btn{
+  margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:.45rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;gap:.4rem;white-space:nowrap;transition:all .15s;
+}
+.guide-btn:hover{border-color:var(--accent);color:var(--accent)}
+.stop-btn{
+  margin-left:.5rem;background:var(--danger);color:#fff;border:0;border-radius:8px;
+  padding:.45rem .9rem;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;gap:.4rem;white-space:nowrap;transition:filter .15s;
+}
+.stop-btn:hover{filter:brightness(1.12)}
+.movement-bar select{
+  margin-left:.5rem;background:var(--bg2);color:var(--text);border:1px solid var(--border);
+  border-radius:8px;padding:.4rem .7rem;font-size:.8rem;cursor:pointer;font-family:inherit;outline:none;
+}
+.movement-bar select:focus{border-color:var(--accent)}
+
+/* ── Video ── */
+.video-wrap{
+  position:relative;background:var(--card);border-radius:var(--r);
+  overflow:hidden;border:1px solid var(--border);flex:1;min-height:0;
+}
+#cam{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+#canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+.cam-label{
+  position:absolute;bottom:.75rem;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);color:var(--text);
+  padding:.35rem .9rem;border-radius:20px;font-size:.78rem;white-space:nowrap;
+  pointer-events:none;
+}
+.loading-overlay{
+  position:absolute;inset:0;background:var(--card);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:1rem;z-index:20;
+}
+.spinner{
+  width:38px;height:38px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{color:var(--muted);font-size:.9rem}
+
+/* ── Cards ── */
+.card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:1rem}
+.card-label{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:.65rem}
+.tip-box{
+  background:rgba(0,232,122,.07);border:1px solid rgba(0,232,122,.25);
+  border-radius:10px;padding:.6rem .9rem;font-size:.78rem;color:var(--accent2);
+  display:flex;gap:.5rem;align-items:flex-start;flex-shrink:0;
+}
+
+/* ── Rep badge overlay ── */
+.rep-badge{
+  position:absolute;top:.7rem;left:.7rem;background:rgba(0,0,0,.55);
+  backdrop-filter:blur(6px);border-radius:12px;padding:.4rem .85rem;
+  display:flex;flex-direction:column;line-height:1.05;pointer-events:none;z-index:5;
+}
+.rep-badge .rn{font-size:1.7rem;font-weight:900;color:var(--accent)}
+.rep-badge .rl{font-size:.56rem;text-transform:uppercase;letter-spacing:1.5px;color:#fff;opacity:.85}
+.rep-badge.pop{animation:repPop .35s ease}
+@keyframes repPop{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+
+/* ── Session stats ── */
+.stat-row{display:flex;gap:.5rem;margin-top:1rem}
+.stat{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.5rem .25rem}
+.stat .sv{font-size:1.3rem;font-weight:800}
+.stat .sl{font-size:.55rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:.15rem}
+.reset-link{background:transparent;border:0;color:var(--muted);font-size:.66rem;cursor:pointer;font-family:inherit;margin-top:.7rem;text-decoration:underline}
+.reset-link:hover{color:var(--danger)}
+
+/* ── Score circle ── */
+.score-card{padding:1.25rem;text-align:center}
+.score-svg{transform:rotate(-90deg)}
+.score-bg{fill:none;stroke:var(--border);stroke-width:9}
+.score-ring{
+  fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;
+  transition:stroke-dashoffset .45s ease,stroke .45s ease;
+}
+.score-num-wrap{
+  position:relative;display:inline-block;width:150px;height:150px;margin:.25rem 0;
+}
+.score-num{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:2.6rem;font-weight:900;transition:color .45s;
+}
+.score-grade{font-size:.85rem;color:var(--muted);margin-top:.15rem}
+
+/* ── Breakdown ── */
+.breakdown-list{display:flex;flex-direction:column;gap:.6rem}
+.bd-header{display:flex;justify-content:space-between;margin-bottom:.2rem;font-size:.82rem}
+.bd-track{background:var(--border);border-radius:4px;height:5px;overflow:hidden}
+.bd-fill{height:100%;border-radius:4px;transition:width .45s ease,background .45s ease}
+.bd-note{font-size:.7rem;color:var(--muted);margin-top:.15rem}
+
+/* ── Feedback ── */
+.feedback-list{display:flex;flex-direction:column;gap:.65rem}
+.fb-item{display:flex;gap:.55rem;align-items:flex-start}
+.fb-icon{
+  width:18px;height:18px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:.62rem;font-weight:700;flex-shrink:0;margin-top:1px;
+}
+.fb-icon.ok{background:var(--ok);color:#000}
+.fb-icon.warn{background:var(--warn);color:#000}
+.fb-icon.bad{background:var(--danger);color:#fff}
+.fb-text{font-size:.83rem;line-height:1.55;color:var(--text)}
+.placeholder{color:var(--muted);font-size:.83rem;line-height:1.55}
+
+/* ── Readiness checklist ── */
+.card-sub{color:var(--muted);font-size:.72rem;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:1px}
+.check-item{display:flex;align-items:center;gap:.55rem;padding:.32rem 0;font-size:.84rem}
+.check-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;flex-shrink:0;transition:background .3s}
+.check-dot.ok{background:var(--ok);color:#000}
+.check-dot.no{background:var(--danger);color:#fff}
+.check-name{flex:1}
+.check-status{color:var(--muted);font-size:.72rem}
+
+@media(max-width:980px){
+  .layout{grid-template-columns:1fr;overflow-y:auto}
+  html,body{height:auto;overflow:auto}
+  .sidebar{max-height:300px}
+  .video-wrap{min-height:48vh}
+  .tagline{display:none}
+}
+
+/* ── Workout report overlay ── */
+.report-overlay{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;animation:fadeIn .25s ease}
+.report-overlay[hidden]{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.report-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 3rem}
+.report-top{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.5rem}
+.report-title{font-size:1.7rem;font-weight:900;letter-spacing:-.5px}
+.report-title span{color:var(--accent)}
+.report-sub{color:var(--muted);font-size:.85rem;margin-top:.15rem}
+.report-close{margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.45rem .8rem;cursor:pointer;font-family:inherit;font-size:.8rem;white-space:nowrap}
+.report-close:hover{border-color:var(--accent);color:var(--accent)}
+.report-hero{display:flex;align-items:center;gap:2rem;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.hero-score{position:relative;width:150px;height:150px;flex-shrink:0}
+.hero-score .hs-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.9rem;font-weight:900}
+.hero-meta{flex:1;min-width:220px}
+.hero-grade{font-size:1.6rem;font-weight:800;margin-bottom:.2rem}
+.hero-line{color:var(--muted);font-size:.88rem;line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+.chip{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.5rem .85rem;min-width:88px}
+.chip .cv{font-size:1.3rem;font-weight:800}
+.chip .cl{font-size:.56rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:.15rem}
+.report-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+.report-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem}
+.report-cols .report-card{margin-bottom:0}
+.report-card h3{font-size:1.02rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.rc-item{margin-bottom:.85rem}
+.rc-head{display:flex;justify-content:space-between;gap:.5rem;font-size:.84rem;margin-bottom:.28rem}
+.rc-track{height:6px;background:var(--border);border-radius:4px;overflow:hidden}
+.rc-fill{height:100%;border-radius:4px}
+.rc-empty{color:var(--muted);font-size:.85rem;line-height:1.55}
+.bullets{list-style:none;display:flex;flex-direction:column;gap:.75rem}
+.bullet{display:flex;gap:.55rem;align-items:flex-start;font-size:.86rem;line-height:1.5}
+.bullet .bi{flex-shrink:0;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;margin-top:1px}
+.bullet.good .bi{background:var(--ok);color:#000}
+.bullet.bad .bi{background:var(--warn);color:#000}
+.mv-row{display:flex;align-items:center;gap:.75rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+.mv-row:last-child{border-bottom:0}
+.mv-ic{font-size:1.3rem;width:1.9rem;text-align:center;flex-shrink:0}
+.mv-name{font-weight:600;font-size:.9rem}
+.mv-detail{color:var(--muted);font-size:.76rem;margin-top:.1rem}
+.mv-score{font-size:1.25rem;font-weight:800;width:3rem;text-align:right;flex-shrink:0}
+.report-actions{display:flex;gap:.75rem;margin-top:1.5rem;justify-content:center;flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:.7rem 1.5rem;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+@media(max-width:760px){.report-cols{grid-template-columns:1fr}.report-hero{gap:1rem;justify-content:center;text-align:center}}
+
+/* ── Form-guide modal ── */
+.modal-overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:1.5rem;animation:fadeIn .2s ease}
+.modal-overlay[hidden]{display:none}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--r);max-width:780px;width:100%;max-height:88vh;overflow-y:auto;padding:1.5rem}
+.modal-top{display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem}
+.modal-title{font-size:1.2rem;font-weight:800}
+.modal-close{margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;width:32px;height:32px;cursor:pointer;font-family:inherit;font-size:.9rem;flex-shrink:0}
+.modal-close:hover{border-color:var(--danger);color:var(--danger)}
+.guide-intro{color:var(--muted);font-size:.84rem;margin-bottom:1.1rem;line-height:1.5}
+.guide-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.guide-card{border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column}
+.guide-card.good{border-color:rgba(0,232,122,.35)}
+.guide-card.bad{border-color:rgba(255,68,85,.35)}
+.guide-card h4{font-size:.92rem;margin-bottom:.8rem}
+.guide-list{list-style:none;display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;flex:1}
+.guide-list li{font-size:.82rem;line-height:1.45;display:flex;gap:.5rem;align-items:flex-start}
+.guide-list .gi{flex-shrink:0;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;margin-top:1px}
+.guide-list .gi.good{background:var(--ok);color:#000}
+.guide-list .gi.bad{background:var(--danger);color:#fff}
+.mann{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:.85rem}
+.guide-note{color:var(--muted);font-size:.72rem;margin-top:1rem;text-align:center}
+@media(max-width:640px){.guide-cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Form<span>Check</span></div>
+  <div class="tagline">AI-Powered Workout Form Analyzer</div>
+  <div class="header-right">
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Starting camera…</span>
+    </div>
+    <div class="controls">
+      <button class="ctrl-btn" id="themeBtn">🌙 Dark</button>
+      <button class="ctrl-btn" id="textBtn">A+ Text</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="search-wrap">
+      <input id="search" class="search-box" type="text" placeholder="Search movements…  ( / )" autocomplete="off">
+    </div>
+    <div class="nav" id="nav"></div>
+    <div class="kbd-hint"><b>/</b> search &middot; <b>↑</b> <b>↓</b> switch movement</div>
+  </aside>
+
+  <!-- MAIN COLUMN -->
+  <div class="main">
+    <!-- Movement breadcrumb + variation -->
+    <div class="movement-bar">
+      <div class="crumb" id="crumb"></div>
+      <button class="guide-btn" id="guideBtn">🤖 Form Demos</button>
+      <button class="stop-btn" id="stopBtn">⏹ Stop Workout</button>
+      <select id="varSelect"></select>
+    </div>
+
+    <!-- Video feed -->
+    <div class="video-wrap">
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-msg" id="loadingMsg">Loading AI pose model…</div>
+      </div>
+      <video id="cam" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div class="rep-badge" id="repBadge"><div class="rn" id="repNum">0</div><div class="rl" id="repLbl">Reps</div></div>
+      <div class="cam-label" id="camLabel">Stand in frame to begin</div>
+    </div>
+
+    <!-- Camera tip -->
+    <div class="tip-box">
+      <span>📷</span>
+      <span id="tipText">Loading…</span>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="right">
+    <!-- Score + session stats -->
+    <div class="card score-card">
+      <div class="card-label">Form Score</div>
+      <div class="score-num-wrap">
+        <svg class="score-svg" width="150" height="150" viewBox="0 0 150 150">
+          <circle class="score-bg" cx="75" cy="75" r="66"/>
+          <circle class="score-ring" id="scoreRing" cx="75" cy="75" r="66"
+            stroke-dasharray="414.7" stroke-dashoffset="207"/>
+        </svg>
+        <div class="score-num" id="scoreNum">--</div>
+      </div>
+      <div class="score-grade" id="scoreGrade">Waiting for pose…</div>
+      <div class="stat-row">
+        <div class="stat"><div class="sv" id="statA-v">0</div><div class="sl" id="statA-l">Reps</div></div>
+        <div class="stat"><div class="sv" id="statB-v">—</div><div class="sl" id="statB-l">Best</div></div>
+        <div class="stat"><div class="sv" id="statC-v">—</div><div class="sl" id="statC-l">Avg</div></div>
+      </div>
+      <button class="reset-link" id="resetStats">Reset session stats</button>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="card">
+      <div class="card-label">Score Breakdown</div>
+      <div class="breakdown-list" id="bdList">
+        <div class="placeholder">Pose not detected yet.</div>
+      </div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="card">
+      <div class="card-label">Form Feedback</div>
+      <div class="feedback-list" id="fbList">
+        <div class="placeholder">Stand in front of the camera and perform your movement to receive feedback.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Full-page workout summary report -->
+<div class="report-overlay" id="reportOverlay" hidden></div>
+
+<!-- Form-guide modal (proper vs improper form videos) -->
+<div class="modal-overlay" id="guideOverlay" hidden></div>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+<script>
+'use strict';
+// ─────────────────────────────────────────────────────────────────────────────
+// LANDMARK INDICES
+// ─────────────────────────────────────────────────────────────────────────────
+const LM = {
+  NOSE:0,L_EAR:7,R_EAR:8,
+  L_SHOULDER:11,R_SHOULDER:12,
+  L_ELBOW:13,R_ELBOW:14,
+  L_WRIST:15,R_WRIST:16,
+  L_HIP:23,R_HIP:24,
+  L_KNEE:25,R_KNEE:26,
+  L_ANKLE:27,R_ANKLE:28,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MATH HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function angle(a, b, c) {
+  const r = Math.atan2(c.y-b.y, c.x-b.x) - Math.atan2(a.y-b.y, a.x-b.x);
+  let deg = Math.abs(r * 180 / Math.PI);
+  if (deg > 180) deg = 360 - deg;
+  return deg;
+}
+
+function scoreAngle(val, ideal, tol) {
+  const d = Math.abs(val - ideal);
+  if (d <= tol * 0.25) return 100;
+  if (d <= tol) return 100 - ((d - tol*0.25) / (tol*0.75)) * 40;
+  return Math.max(0, 60 - ((d - tol) / tol) * 60);
+}
+
+function mid(a, b) { return { x:(a.x+b.x)/2, y:(a.y+b.y)/2, z:(a.z+b.z)/2 }; }
+function clamp(v,a,b){ return Math.min(Math.max(v,a),b); }
+
+// Torso forward lean in degrees (0 = vertical, 90 = horizontal)
+function torsoLean(lm) {
+  const sh = mid(lm[LM.L_SHOULDER], lm[LM.R_SHOULDER]);
+  const hp = mid(lm[LM.L_HIP],      lm[LM.R_HIP]);
+  return Math.abs(Math.atan2(sh.x - hp.x, hp.y - sh.y) * 180 / Math.PI);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXERCISE ANALYZERS  (each returns {score, breakdown, feedback})
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── SQUAT ──
+function analyzeSquat(lm, variation) {
+  const lKneeAng = angle(lm[LM.L_HIP], lm[LM.L_KNEE], lm[LM.L_ANKLE]);
+  const rKneeAng = angle(lm[LM.R_HIP], lm[LM.R_KNEE], lm[LM.R_ANKLE]);
+  const avgKnee  = (lKneeAng + rKneeAng) / 2;
+  const lean     = torsoLean(lm);
+  const kneeDiff = Math.abs(lKneeAng - rKneeAng);
+
+  // Phase detection
+  const atBottom  = avgKnee < 120;
+  const standing  = avgKnee > 155;
+  const active    = !standing;
+
+  // Target depth
+  const depthTarget = { quarter:135, half:115, sumo:95, pause:90, goblet:90 }[variation] ?? 90;
+
+  // 1. Depth (30 pts)
+  let depthScore, depthNote;
+  if (standing) {
+    depthScore = 85; depthNote = 'Standing – begin descending';
+  } else {
+    depthScore = scoreAngle(avgKnee, depthTarget, 12);
+    depthNote  = avgKnee > depthTarget + 15 ? 'Too shallow – go deeper'
+               : avgKnee < depthTarget - 15 ? 'Slightly below target'
+               : 'Good depth';
+  }
+
+  // 2. Torso upright (25 pts)
+  const idealLean = { front:10, lowbar:38, sumo:15 }[variation] ?? 22;
+  const backScore = scoreAngle(lean, idealLean, 15);
+  const backNote  = lean > idealLean+18 ? 'Leaning too far forward'
+                  : lean < idealLean-10 ? 'Slightly over-upright'
+                  : 'Good torso position';
+
+  // 3. Knee tracking (25 pts) – compare knee x vs ankle x
+  const lValgus  = active ? Math.max(0, (lm[LM.L_KNEE].x - lm[LM.L_ANKLE].x)) : 0;
+  const rValgus  = active ? Math.max(0, lm[LM.R_ANKLE].x - lm[LM.R_KNEE].x) : 0;
+  const maxVal   = Math.max(lValgus, rValgus);
+  const trackScore = maxVal < 0.025 ? 100 : maxVal < 0.06 ? 80 : maxVal < 0.1 ? 55 : 30;
+  const trackNote  = maxVal < 0.025 ? 'Knees tracking well'
+                   : maxVal < 0.06  ? 'Slight knee cave'
+                   : 'Knees caving – push them out';
+
+  // 4. Symmetry (20 pts)
+  const symScore = kneeDiff < 5 ? 100 : kneeDiff < 12 ? 80 : kneeDiff < 22 ? 60 : 40;
+
+  const breakdown = {
+    depth:    {name:'Depth',         score:Math.round(depthScore), weight:.30, note:depthNote},
+    back:     {name:'Back Position', score:Math.round(backScore),  weight:.25, note:backNote},
+    tracking: {name:'Knee Tracking', score:Math.round(trackScore), weight:.25, note:trackNote},
+    symmetry: {name:'Symmetry',      score:Math.round(symScore),   weight:.20},
+  };
+
+  const fb = [];
+  if (!active) {
+    fb.push({t:'ok', s:'Push hips back and down to begin your squat. Keep your chest up and core braced.'});
+  } else {
+    if (avgKnee > depthTarget + 18) fb.push({t:'warn', s:'You are not reaching full depth. Drive your hips lower to hit parallel or below for maximum muscle activation.'});
+    else if (depthScore > 80)       fb.push({t:'ok',   s:'Excellent depth! You are reaching the target range for your squat variation.'});
+    if (lean > idealLean + 20)      fb.push({t:'warn', s:'Your torso is leaning excessively forward. Focus on keeping your chest up and maintaining a more upright spine.'});
+    if (maxVal > 0.06)              fb.push({t:'bad',  s:'Knee caving detected. Push your knees outward so they track over your second toe throughout the movement.'});
+    if (kneeDiff > 15)              fb.push({t:'warn', s:'Your squat is asymmetric. Check that your weight is distributed evenly and your feet are placed symmetrically.'});
+    if (fb.filter(f=>f.t!=='ok').length === 0) {
+      fb.push({t:'ok', s:'Your squat form looks great! Good depth, upright torso, and solid knee tracking.'});
+      fb.push({t:'ok', s:'Keep your core braced throughout and control the descent. Consider adding pause reps for extra depth work.'});
+    }
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── LUNGE ──
+function analyzeLunge(lm, variation) {
+  // Determine front/back leg by which knee is lower (higher y in image = lower position)
+  const lKneeLower = lm[LM.L_KNEE].y > lm[LM.R_KNEE].y;
+  const fKnee = lm[lKneeLower ? LM.L_KNEE : LM.R_KNEE];
+  const fHip  = lm[lKneeLower ? LM.L_HIP  : LM.R_HIP];
+  const fAnkle= lm[lKneeLower ? LM.L_ANKLE: LM.R_ANKLE];
+  const bKnee = lm[lKneeLower ? LM.R_KNEE : LM.L_KNEE];
+  const bHip  = lm[lKneeLower ? LM.R_HIP  : LM.L_HIP];
+  const bAnkle= lm[lKneeLower ? LM.R_ANKLE: LM.L_ANKLE];
+
+  const fKneeAng = angle(fHip, fKnee, fAnkle);
+  const bKneeAng = angle(bHip, bKnee, bAnkle);
+  const lean = torsoLean(lm);
+  const inLunge = fKneeAng < 135;
+
+  // 1. Front knee angle (25 pts)
+  const fKScore = inLunge ? scoreAngle(fKneeAng, 90, 15) : 85;
+  const fKNote  = !inLunge ? 'Step forward to lunge' : fKneeAng > 110 ? 'Bend front knee more' : 'Good knee angle';
+
+  // 2. Front knee over ankle (25 pts)
+  const kAnkleX = fKnee.x - fAnkle.x;
+  const kaScore  = Math.abs(kAnkleX) < 0.04 ? 100
+                 : kAnkleX > 0.12 ? 50 : kAnkleX > 0.07 ? 78 : 92;
+  const kaNote   = kAnkleX > 0.12 ? 'Knee too far over toes'
+                 : kAnkleX > 0.07 ? 'Knee slightly past toes' : 'Knee well-aligned';
+
+  // 3. Torso upright (25 pts)
+  const torsoScore = lean < 8 ? 100 : lean < 18 ? 85 : lean < 28 ? 65 : 40;
+  const torsoNote  = lean > 28 ? 'Lean back – keep torso tall' : lean > 18 ? 'Slight forward lean' : 'Torso upright';
+
+  // 4. Back knee depth (25 pts)
+  const bKScore = inLunge ? scoreAngle(bKneeAng, 90, 18) : 85;
+
+  const breakdown = {
+    frontKnee: {name:'Front Knee Angle', score:Math.round(fKScore), weight:.25, note:fKNote},
+    kAlign:    {name:'Knee over Ankle',  score:Math.round(kaScore),  weight:.25, note:kaNote},
+    torso:     {name:'Torso Position',   score:Math.round(torsoScore),weight:.25, note:torsoNote},
+    backKnee:  {name:'Back Knee Depth',  score:Math.round(bKScore),  weight:.25},
+  };
+
+  const fb = [];
+  if (!inLunge) {
+    fb.push({t:'ok', s:'Step forward into a lunge position and lower your back knee toward the ground.'});
+  } else {
+    if (fKneeAng > 115) fb.push({t:'warn', s:'Bend your front knee further to reach 90 degrees for full lunge depth.'});
+    if (kAnkleX > 0.12)  fb.push({t:'bad',  s:'Your front knee is shooting past your toes. Take a longer step and lower vertically rather than pushing forward.'});
+    if (lean > 25)       fb.push({t:'warn', s:'Keep your torso tall and upright. Avoid leaning forward — think about stacking your shoulders over your hips.'});
+    if (bKneeAng > 120)  fb.push({t:'warn', s:'Lower your back knee closer to the ground for full lunge depth and maximum hip flexor stretch.'});
+    if (fb.filter(f=>f.t!=='ok').length === 0) {
+      fb.push({t:'ok', s:'Great lunge form! Good front knee angle, upright torso, and solid depth.'});
+      fb.push({t:'ok', s:'For extra challenge try adding a pause at the bottom, or switching to walking lunges.'});
+    }
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── PUSH-UP ──
+function analyzePushup(lm, variation) {
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+
+  const sh  = mid(lm[LM.L_SHOULDER], lm[LM.R_SHOULDER]);
+  const hp  = mid(lm[LM.L_HIP],      lm[LM.R_HIP]);
+  const ank = mid(lm[LM.L_ANKLE],    lm[LM.R_ANKLE]);
+
+  // Body alignment: hip should lie on the shoulder–ankle line
+  const dx = ank.x - sh.x, dy = ank.y - sh.y;
+  const t  = dx*dx + dy*dy < 0.0001 ? 0.5 : ((hp.x-sh.x)*dx + (hp.y-sh.y)*dy) / (dx*dx+dy*dy);
+  const projX = sh.x + t*dx, projY = sh.y + t*dy;
+  const hipDev = Math.hypot(hp.x - projX, hp.y - projY);
+
+  // 1. Body alignment (30 pts)
+  const bodyScore = hipDev < 0.03 ? 100 : hipDev < 0.07 ? 80 : hipDev < 0.12 ? 55 : 30;
+  const hipHigh   = hp.y < projY - 0.03;
+  const bodyNote  = hipDev < 0.03 ? 'Body in straight line'
+                  : hipHigh ? 'Hips too high (pike)' : 'Hips sagging';
+
+  // 2. Elbow depth (30 pts)
+  const atBottom  = avgElb < 120;
+  const elbScore  = atBottom ? scoreAngle(avgElb, 90, 18) : 85;
+  const elbNote   = !atBottom ? 'Descending or top position'
+                  : avgElb > 115 ? 'Go lower to reach 90°' : 'Good depth!';
+
+  // 3. Elbow tuck/flare (20 pts)
+  const lFl = Math.abs(lm[LM.L_ELBOW].x - lm[LM.L_SHOULDER].x);
+  const rFl = Math.abs(lm[LM.R_ELBOW].x - lm[LM.R_SHOULDER].x);
+  const sw  = Math.abs(lm[LM.L_SHOULDER].x - lm[LM.R_SHOULDER].x) || 0.2;
+  const flare = (lFl + rFl) / 2 / sw;
+  const targetFlare = variation === 'diamond' ? 0.15 : variation === 'wide' ? 1.1 : 0.55;
+  const flareScore  = Math.abs(flare - targetFlare) < 0.25 ? 95 : 72;
+
+  // 4. Symmetry (20 pts)
+  const diff = Math.abs(lElbAng - rElbAng);
+  const symScore = diff < 5 ? 100 : diff < 15 ? 80 : 58;
+
+  const breakdown = {
+    body:     {name:'Body Alignment', score:Math.round(bodyScore), weight:.30, note:bodyNote},
+    depth:    {name:'Elbow Depth',    score:Math.round(elbScore),  weight:.30, note:elbNote},
+    elbFlare: {name:'Elbow Position', score:Math.round(flareScore),weight:.20},
+    symmetry: {name:'Symmetry',       score:Math.round(symScore),  weight:.20},
+  };
+
+  const fb = [];
+  if (hipDev > 0.07) {
+    fb.push(hipHigh
+      ? {t:'warn', s:'Hips too high. Lower them so your body forms a straight plank from head to heels.'}
+      : {t:'bad',  s:'Hips are sagging. Brace your core and squeeze your glutes to maintain a rigid plank position.'});
+  }
+  if (atBottom && avgElb > 115) fb.push({t:'warn', s:'Go lower — your chest should nearly touch the floor. Aim for a 90-degree elbow angle at the bottom.'});
+  if (diff > 15) fb.push({t:'warn', s:'Asymmetric arm bend detected. Make sure both hands are evenly placed and you are pressing equally with both arms.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Great push-up form! Body is aligned and depth looks solid.'});
+    fb.push({t:'ok', s:'Exhale on the push and inhale on the way down. Add a pause at the bottom for extra difficulty.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── DEADLIFT ──
+function analyzeDeadlift(lm, variation) {
+  const lHipAng = angle(lm[LM.L_SHOULDER], lm[LM.L_HIP], lm[LM.L_KNEE]);
+  const rHipAng = angle(lm[LM.R_SHOULDER], lm[LM.R_HIP], lm[LM.R_KNEE]);
+  const avgHip  = (lHipAng + rHipAng) / 2;
+  const lean    = torsoLean(lm);
+  const inHinge = avgHip < 145;
+
+  // 1. Back flatness proxy (35 pts) – hard from front; use shoulder-level check
+  // We look at lateral symmetry of shoulders relative to hips
+  const lDiff = Math.abs(lm[LM.L_SHOULDER].y - lm[LM.L_HIP].y);
+  const rDiff = Math.abs(lm[LM.R_SHOULDER].y - lm[LM.R_HIP].y);
+  const latAsym = Math.abs(lDiff - rDiff);
+  const backScore = latAsym < 0.04 ? 90 : latAsym < 0.08 ? 74 : 55;
+
+  // 2. Hip hinge depth (25 pts)
+  const targetHip = { sumo:95, romanian:75, stiff_leg:65 }[variation] ?? 85;
+  const hingeScore = inHinge ? scoreAngle(avgHip, targetHip, 18) : 85;
+  const hingeNote  = !inHinge ? 'Set up or lockout position'
+                   : avgHip > targetHip + 20 ? 'Hinge more at hips'
+                   : 'Good hip hinge';
+
+  // 3. Knee tracking (20 pts)
+  const lKT = lm[LM.L_KNEE].x - lm[LM.L_ANKLE].x;
+  const rKT = lm[LM.R_KNEE].x - lm[LM.R_ANKLE].x;
+  const ktScore = Math.abs(lKT) < 0.05 && Math.abs(rKT) < 0.05 ? 95 : 72;
+
+  // 4. Symmetry (20 pts)
+  const symScore = Math.abs(lHipAng - rHipAng) < 6 ? 100 : 72;
+
+  const breakdown = {
+    back:     {name:'Back Position',  score:Math.round(backScore),  weight:.35, note:'Best verified from side view'},
+    hinge:    {name:'Hip Hinge',      score:Math.round(hingeScore), weight:.25, note:hingeNote},
+    tracking: {name:'Knee Tracking',  score:Math.round(ktScore),    weight:.20},
+    symmetry: {name:'Symmetry',       score:Math.round(symScore),   weight:.20},
+  };
+
+  const fb = [];
+  fb.push({t:'warn', s:'For the best deadlift analysis, position your camera to the side so back rounding and bar path are clearly visible.'});
+  if (inHinge && avgHip > targetHip + 22) fb.push({t:'warn', s:'Push your hips back further into the hinge. Imagine you are trying to touch a wall behind you with your glutes.'});
+  if (latAsym > 0.08) fb.push({t:'warn', s:'Possible spinal twist or lateral lean detected. Ensure your shoulders are level and you are pulling symmetrically.'});
+  if (fb.filter(f=>f.t==='ok').length === 0 && fb.length < 2) {
+    fb.push({t:'ok', s:'Hip hinge pattern and symmetry look solid from this angle. Keep your lats engaged and drive through the floor.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── OVERHEAD PRESS ──
+function analyzeOHP(lm, variation) {
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+  const lean    = torsoLean(lm);
+  const atTop   = avgElb > 155;
+
+  // 1. Full lockout at top (25 pts)
+  const lockScore = atTop ? 100 : scoreAngle(avgElb, 175, 15);
+  const lockNote  = atTop ? 'Full lockout!' : avgElb < 130 ? 'Keep pressing up' : 'Near lockout';
+
+  // 2. Wrist over elbow alignment (25 pts)
+  const lAlign = Math.abs(lm[LM.L_WRIST].x - lm[LM.L_ELBOW].x);
+  const rAlign = Math.abs(lm[LM.R_WRIST].x - lm[LM.R_ELBOW].x);
+  const alignScore = (lAlign+rAlign)/2 < 0.05 ? 100 : (lAlign+rAlign)/2 < 0.12 ? 80 : 60;
+
+  // 3. Core – no excessive lean back (25 pts)
+  const coreScore = lean < 6 ? 100 : lean < 16 ? 85 : lean < 26 ? 65 : 42;
+  const coreNote  = lean > 26 ? 'Lean back too much' : lean > 16 ? 'Slight lean back' : 'Good core position';
+
+  // 4. Symmetry (25 pts)
+  const diff = Math.abs(lElbAng - rElbAng);
+  const symScore = diff < 5 ? 100 : diff < 12 ? 82 : 60;
+
+  const breakdown = {
+    lockout:  {name:'Lockout',          score:Math.round(lockScore),  weight:.25, note:lockNote},
+    alignment:{name:'Wrist/Elbow Stack',score:Math.round(alignScore), weight:.25},
+    core:     {name:'Core Stability',   score:Math.round(coreScore),  weight:.25, note:coreNote},
+    symmetry: {name:'Symmetry',         score:Math.round(symScore),   weight:.25},
+  };
+
+  const fb = [];
+  if (!atTop && avgElb < 150) fb.push({t:'warn', s:'Press to full lockout overhead, squeezing your triceps at the top of each rep.'});
+  if (lean > 22) fb.push({t:'bad', s:'Excessive backward lean — you are using your lower back instead of pressing. Brace your core harder and squeeze your glutes throughout the press.'});
+  if (diff > 15) fb.push({t:'warn', s:'One arm is pressing differently from the other. Check your grip width and ensure both shoulders are working equally.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Excellent overhead press form! Good lockout, upright torso, and solid alignment.'});
+    fb.push({t:'ok', s:'Keep the bar path vertical and inhale before the press, exhale at the top.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── BICEP CURL ──
+function analyzeCurl(lm, variation) {
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+  const lean    = torsoLean(lm);
+
+  // 1. Elbow stays at side (35 pts)
+  const lDrift = Math.abs(lm[LM.L_ELBOW].x - lm[LM.L_SHOULDER].x);
+  const rDrift = Math.abs(lm[LM.R_ELBOW].x - lm[LM.R_SHOULDER].x);
+  const drift  = (lDrift + rDrift) / 2;
+  const elbScore= drift < 0.05 ? 100 : drift < 0.10 ? 78 : drift < 0.16 ? 55 : 32;
+  const elbNote = drift < 0.05 ? 'Elbows pinned to sides' : drift < 0.10 ? 'Slight elbow drift' : 'Elbows drifting out';
+
+  // 2. Range of motion (35 pts)
+  const romScore = avgElb < 60 ? 100 : avgElb < 80 ? 90 : avgElb > 150 ? 88 : Math.max(40, 100 - (avgElb-60)*1.6);
+
+  // 3. Body stability – no swinging (30 pts)
+  const swayScore = lean < 6 ? 100 : lean < 14 ? 82 : lean < 22 ? 60 : 35;
+  const swayNote  = lean > 22 ? 'Using body momentum' : lean > 14 ? 'Slight body sway' : 'Body stable';
+
+  const breakdown = {
+    elbPos: {name:'Elbow Position', score:Math.round(elbScore),  weight:.35, note:elbNote},
+    rom:    {name:'Range of Motion',score:Math.round(romScore),  weight:.35},
+    sway:   {name:'Body Stability', score:Math.round(swayScore), weight:.30, note:swayNote},
+  };
+
+  const fb = [];
+  if (drift > 0.10) fb.push({t:'warn', s:'Keep your elbows pinned tightly to your sides throughout the curl to maximally isolate the biceps.'});
+  if (drift > 0.16) fb.push({t:'bad',  s:'Elbows are swinging out significantly. Lower the weight and focus on strict form rather than momentum.'});
+  if (lean > 20)    fb.push({t:'bad',  s:'You are swinging your torso to lift the weight. Keep your body still and reduce the weight if necessary.'});
+  if (avgElb < 65 && avgElb > 0) fb.push({t:'ok', s:'Great peak contraction! Hold and squeeze at the top for maximum bicep activation.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Solid curl form! Elbows are in position and you have good range of motion.'});
+    fb.push({t:'ok', s:'Control the lowering phase — a 3-second eccentric builds more strength than a fast drop.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── BENT-OVER ROW ──
+function analyzeBentOverRow(lm, variation) {
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+  const lean    = torsoLean(lm);
+
+  // Torso angle from horizontal (bent-over row needs significant hinge)
+  const torsoFromHorz = 90 - lean;
+
+  // 1. Torso angle hinge (35 pts) – 30-70° from horizontal
+  const torsoScore = torsoFromHorz >= 28 && torsoFromHorz <= 72 ? 100
+                   : torsoFromHorz < 28 ? Math.max(40, 100-(28-torsoFromHorz)*2.5)
+                   : 85;
+  const torsoNote  = torsoFromHorz < 25 ? 'Hinge forward more at hips'
+                   : torsoFromHorz > 72 ? 'Slightly too horizontal'
+                   : `Good hinge — ${Math.round(torsoFromHorz)}° from floor`;
+
+  // 2. Row pull height – elbows above torso at top (35 pts)
+  const lAbove = lm[LM.L_SHOULDER].y - lm[LM.L_ELBOW].y;
+  const rAbove = lm[LM.R_SHOULDER].y - lm[LM.R_ELBOW].y;
+  const pullScore = avgElb < 90
+    ? ((lAbove + rAbove) / 2 > -0.04 ? 100 : 75)
+    : 85;
+  const pullNote  = avgElb < 90 ? 'Elbows driven high — good pull' : 'Extend for full row';
+
+  // 3. Elbow path – close to body (30 pts)
+  const lFlare = Math.abs(lm[LM.L_ELBOW].x - lm[LM.L_SHOULDER].x);
+  const rFlare = Math.abs(lm[LM.R_ELBOW].x - lm[LM.R_SHOULDER].x);
+  const flareScore = (lFlare + rFlare) / 2 < 0.14 ? 95 : 70;
+
+  const breakdown = {
+    hinge:  {name:'Hip Hinge Angle', score:Math.round(torsoScore), weight:.35, note:torsoNote},
+    pull:   {name:'Row Height',      score:Math.round(pullScore),  weight:.35, note:pullNote},
+    elbow:  {name:'Elbow Path',      score:Math.round(flareScore), weight:.30},
+  };
+
+  const fb = [];
+  if (torsoFromHorz < 25) fb.push({t:'warn', s:'Hinge further forward at the hips so your torso is closer to parallel with the floor for a proper bent-over row.'});
+  if (avgElb < 90 && (lAbove + rAbove) / 2 < -0.1) fb.push({t:'warn', s:'Pull your elbows higher — drive them past your torso and squeeze your shoulder blades together at the top.'});
+  fb.push({t:'warn', s:'Side view recommended for full analysis of bar path and back position.'});
+  if (fb.filter(f=>f.t!=='ok').length <= 1) {
+    fb.push({t:'ok', s:'Good hip hinge and rowing mechanics. Focus on squeezing the shoulder blades together at peak contraction.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── BENCH PRESS ──
+function analyzeBenchPress(lm, variation) {
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+  const diff    = Math.abs(lElbAng - rElbAng);
+  const sw      = Math.abs(lm[LM.L_SHOULDER].x - lm[LM.R_SHOULDER].x) || 0.2;
+  const lFl     = Math.abs(lm[LM.L_ELBOW].x - lm[LM.L_SHOULDER].x);
+  const rFl     = Math.abs(lm[LM.R_ELBOW].x - lm[LM.R_SHOULDER].x);
+  const relFlare= (lFl + rFl) / 2 / sw;
+
+  // 1. Elbow angle (40 pts)
+  const atBottom = avgElb < 110;
+  const elbScore = atBottom ? scoreAngle(avgElb, 90, 18) : 85;
+
+  // 2. Symmetry (30 pts)
+  const symScore = diff < 5 ? 100 : diff < 15 ? 80 : 58;
+
+  // 3. Elbow width (30 pts)
+  const targetFlare = { close_grip:0.3, wide:1.0 }[variation] ?? 0.6;
+  const flareScore  = Math.abs(relFlare - targetFlare) < 0.25 ? 95 : 72;
+
+  const breakdown = {
+    elbAngle: {name:'Elbow Angle',  score:Math.round(elbScore),  weight:.40},
+    symmetry: {name:'Symmetry',     score:Math.round(symScore),  weight:.30},
+    width:    {name:'Elbow Width',  score:Math.round(flareScore),weight:.30},
+  };
+
+  const fb = [];
+  fb.push({t:'warn', s:'Position your camera perpendicular to the bench for full bar path and arch analysis — front view is limited for bench press.'});
+  if (diff > 15) fb.push({t:'warn', s:'Uneven elbow bend detected. Ensure both hands grip the bar evenly and press with equal force from each side.'});
+  if (atBottom && avgElb > 115) fb.push({t:'warn', s:'Lower the bar to your chest. A full range of motion is key for chest development and strength.'});
+  if (fb.filter(f=>f.t==='ok').length === 0) {
+    fb.push({t:'ok', s:'Keep your shoulder blades retracted and depressed, feet flat on the floor, and maintain a slight natural arch in your lower back.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── PLANK ──
+function analyzePlank(lm, variation) {
+  const sh  = mid(lm[LM.L_SHOULDER], lm[LM.R_SHOULDER]);
+  const hp  = mid(lm[LM.L_HIP],      lm[LM.R_HIP]);
+  const ank = mid(lm[LM.L_ANKLE],    lm[LM.R_ANKLE]);
+  const dx = ank.x - sh.x, dy = ank.y - sh.y;
+  const t  = dx*dx + dy*dy < 0.0001 ? 0.5 : ((hp.x-sh.x)*dx + (hp.y-sh.y)*dy) / (dx*dx+dy*dy);
+  const projX = sh.x + t*dx, projY = sh.y + t*dy;
+  const hipDev = Math.hypot(hp.x - projX, hp.y - projY);
+  const hipHigh = hp.y < projY - 0.025;
+
+  const bodyScore = hipDev < 0.025 ? 100 : hipDev < 0.06 ? 82 : hipDev < 0.1 ? 58 : 32;
+  const headLean  = torsoLean(lm);
+  const headScore = headLean < 8 ? 100 : headLean < 18 ? 82 : 60;
+
+  const lElbAng = angle(lm[LM.L_SHOULDER], lm[LM.L_ELBOW], lm[LM.L_WRIST]);
+  const rElbAng = angle(lm[LM.R_SHOULDER], lm[LM.R_ELBOW], lm[LM.R_WRIST]);
+  const avgElb  = (lElbAng + rElbAng) / 2;
+  const elbScore = variation === 'extended' ? 100 : scoreAngle(avgElb, 90, 10);
+
+  const breakdown = {
+    body:  {name:'Body Alignment', score:Math.round(bodyScore), weight:.50, note: hipDev<0.025?'Perfect plank line':hipHigh?'Hips too high':'Hips sagging'},
+    head:  {name:'Head/Neck',      score:Math.round(headScore), weight:.25},
+    elbow: {name:'Elbow Position', score:Math.round(elbScore),  weight:.25},
+  };
+
+  const fb = [];
+  if (hipDev > 0.06)  fb.push(hipHigh ? {t:'warn', s:'Lower your hips to create a straight line from shoulders to ankles.'} : {t:'bad', s:'Hips are sagging. Squeeze your core and glutes to keep your body rigid.'});
+  if (headLean > 16) fb.push({t:'warn', s:'Keep your head in a neutral position in line with your spine — do not let it drop or crane upward.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Excellent plank position! Body is in a straight line with good core tension.'});
+    fb.push({t:'ok', s:'Focus on squeezing every muscle: core, glutes, quads, and even your fists if forearm planking.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── GLUTE BRIDGE ──
+function analyzeGluteBridge(lm, variation) {
+  const lHipAng = angle(lm[LM.L_SHOULDER], lm[LM.L_HIP], lm[LM.L_KNEE]);
+  const rHipAng = angle(lm[LM.R_SHOULDER], lm[LM.R_HIP], lm[LM.R_KNEE]);
+  const avgHip  = (lHipAng + rHipAng) / 2;
+  const atTop   = avgHip > 160;
+  const lKneeAng= angle(lm[LM.L_HIP], lm[LM.L_KNEE], lm[LM.L_ANKLE]);
+  const rKneeAng= angle(lm[LM.R_HIP], lm[LM.R_KNEE], lm[LM.R_ANKLE]);
+  const avgKnee = (lKneeAng + rKneeAng) / 2;
+  const sym     = Math.abs(lHipAng - rHipAng);
+
+  const hipScore  = atTop ? 100 : scoreAngle(avgHip, 175, 10);
+  const kneeScore = scoreAngle(avgKnee, 90, 18);
+  const symScore  = sym < 5 ? 100 : sym < 12 ? 80 : 58;
+
+  const breakdown = {
+    hipExt:  {name:'Hip Extension',  score:Math.round(hipScore),  weight:.45, note: atTop ? 'Full extension!' : 'Squeeze glutes higher'},
+    knee:    {name:'Knee Angle',     score:Math.round(kneeScore), weight:.30, note:`${Math.round(avgKnee)}° — aim for 90°`},
+    symmetry:{name:'Symmetry',       score:Math.round(symScore),  weight:.25},
+  };
+
+  const fb = [];
+  if (!atTop) fb.push({t:'warn', s:'Drive your hips up to full extension, squeezing your glutes hard at the top. Your body should form a straight line from knees to shoulders.'});
+  if (avgKnee > 115) fb.push({t:'warn', s:'Your feet may be placed too far away. Move them closer to your glutes so your knees form a ~90-degree angle.'});
+  if (sym > 12) fb.push({t:'warn', s:'Asymmetric bridge — one hip is lower than the other. Focus on pressing evenly through both heels.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Excellent glute bridge! Full hip extension and solid symmetry.'});
+    fb.push({t:'ok', s:'For extra glutes engagement, pause at the top for 2 seconds and add a squeeze before lowering.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEIGHTED SCORE HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SPORTS MOVEMENT ANALYZERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── BASEBALL / SOFTBALL SWING ──
+function analyzeBaseballSwing(lm, variation) {
+  const lKnee = angle(lm[LM.L_HIP], lm[LM.L_KNEE], lm[LM.L_ANKLE]);
+  const rKnee = angle(lm[LM.R_HIP], lm[LM.R_KNEE], lm[LM.R_ANKLE]);
+  const avgKnee = (lKnee + rKnee) / 2;
+
+  const hipMid = mid(lm[LM.L_HIP],   lm[LM.R_HIP]);
+  const ankMid = mid(lm[LM.L_ANKLE], lm[LM.R_ANKLE]);
+
+  // 1. Athletic stance (knee flex)
+  const stanceScore = scoreAngle(avgKnee, 132, 28);
+  const stanceNote  = avgKnee > 165 ? 'Legs too straight — get athletic'
+                    : avgKnee < 95  ? 'Too crouched' : 'Good athletic stance';
+
+  // 2. Balance — hips stacked over base
+  const balDev = Math.abs(hipMid.x - ankMid.x);
+  const balScore = balDev < 0.05 ? 100 : balDev < 0.10 ? 82 : balDev < 0.18 ? 58 : 35;
+  const balNote  = balDev < 0.05 ? 'Well balanced over base'
+                 : balDev < 0.10 ? 'Slight weight drift' : 'Off balance — stay centered';
+
+  // 3. Hip–shoulder separation (rotational torque)
+  const shAng  = Math.atan2(lm[LM.R_SHOULDER].y - lm[LM.L_SHOULDER].y, lm[LM.R_SHOULDER].x - lm[LM.L_SHOULDER].x) * 180/Math.PI;
+  const hipAng = Math.atan2(lm[LM.R_HIP].y - lm[LM.L_HIP].y, lm[LM.R_HIP].x - lm[LM.L_HIP].x) * 180/Math.PI;
+  let sep = Math.abs(shAng - hipAng); if (sep > 180) sep = 360 - sep;
+  const sepScore = scoreAngle(sep, 22, 20);
+  const sepNote  = sep < 6 ? 'Coil hips vs shoulders for torque' : 'Good torso separation';
+
+  // 4. Head stability — quiet, over center
+  const headDev = Math.abs(lm[LM.NOSE].x - ankMid.x);
+  const headScore = headDev < 0.08 ? 100 : headDev < 0.15 ? 80 : headDev < 0.24 ? 55 : 35;
+  const headNote  = headDev < 0.08 ? 'Head still and centered' : 'Keep head still, eyes on the ball';
+
+  const breakdown = {
+    stance:   {name:'Athletic Stance',  score:Math.round(stanceScore), weight:.25, note:stanceNote},
+    balance:  {name:'Balance',          score:Math.round(balScore),    weight:.25, note:balNote},
+    rotation: {name:'Hip-Shoulder Coil', score:Math.round(sepScore),   weight:.25, note:sepNote},
+    head:     {name:'Head Position',    score:Math.round(headScore),   weight:.25, note:headNote},
+  };
+
+  const fb = [];
+  if (avgKnee > 165) fb.push({t:'warn', s:'Bend your knees into an athletic stance. A loaded, slightly crouched base lets you drive through the ball with power.'});
+  if (balDev > 0.10) fb.push({t:'bad',  s:'Your weight is drifting off your base. Stay centered so you can rotate explosively instead of lunging at the pitch.'});
+  if (sep < 6)       fb.push({t:'warn', s:'Create separation between your hips and shoulders — fire your hips first while your hands stay back to build torque.'});
+  if (headDev > 0.15)fb.push({t:'warn', s:'Keep your head still and your eyes locked on the contact point. A quiet head improves timing and balance.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Great swing mechanics! Solid athletic base, good balance, and strong rotational separation.'});
+    fb.push({t:'ok', s:'Let your hips lead and finish high. Keep grooving that smooth weight transfer from back foot to front.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── BASKETBALL SHOT ──
+function analyzeBasketballShot(lm, variation) {
+  // Shooting arm = the higher hand (smaller y)
+  const leftUp = lm[LM.L_WRIST].y < lm[LM.R_WRIST].y;
+  const sh = lm[leftUp ? LM.L_SHOULDER : LM.R_SHOULDER];
+  const el = lm[leftUp ? LM.L_ELBOW    : LM.R_ELBOW];
+  const wr = lm[leftUp ? LM.L_WRIST    : LM.R_WRIST];
+
+  const elbAng  = angle(sh, el, wr);
+  const release = wr.y < sh.y - 0.05;   // wrist above shoulder → release / follow-through
+
+  // 1. Elbow under the ball (wrist stacked over elbow)
+  const align = Math.abs(wr.x - el.x);
+  const alignScore = align < 0.04 ? 100 : align < 0.09 ? 80 : align < 0.15 ? 55 : 32;
+  const alignNote  = align < 0.04 ? 'Elbow tucked under the ball'
+                   : align < 0.09 ? 'Slight elbow flare' : 'Elbow flaring out — tuck it in';
+
+  // 2. Shooting arm angle by phase
+  const armScore = release ? scoreAngle(elbAng, 168, 18) : scoreAngle(elbAng, 92, 22);
+  const armNote  = release ? (elbAng > 150 ? 'Full extension on release' : 'Extend fully & snap wrist')
+                           : (elbAng > 70 && elbAng < 115 ? 'Good set point (~90°)' : 'Set elbow near 90°');
+
+  // 3. Leg drive
+  const avgKnee = (angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]) + angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])) / 2;
+  const legScore = release ? scoreAngle(avgKnee, 172, 16) : scoreAngle(avgKnee, 142, 28);
+  const legNote  = release ? 'Drive up through your legs' : 'Bend knees to load power';
+
+  // 4. Balance / base
+  const balDev = Math.abs(mid(lm[LM.L_HIP],lm[LM.R_HIP]).x - mid(lm[LM.L_ANKLE],lm[LM.R_ANKLE]).x);
+  const balScore = balDev < 0.06 ? 100 : balDev < 0.12 ? 78 : 50;
+
+  const breakdown = {
+    align:  {name:'Elbow Alignment', score:Math.round(alignScore), weight:.30, note:alignNote},
+    arm:    {name:'Shooting Arm',    score:Math.round(armScore),   weight:.25, note:armNote},
+    legs:   {name:'Leg Drive',       score:Math.round(legScore),   weight:.25, note:legNote},
+    balance:{name:'Balance',         score:Math.round(balScore),   weight:.20},
+  };
+
+  const fb = [];
+  if (align > 0.09) fb.push({t:'bad', s:'Your shooting elbow is flaring out. Keep it tucked so wrist, elbow, and shoulder stack in a straight line toward the rim.'});
+  if (release && elbAng < 150) fb.push({t:'warn', s:'Extend your arm fully on release and snap your wrist down — finish with fingers pointing at the floor for backspin.'});
+  if (!release && (elbAng < 70 || elbAng > 115)) fb.push({t:'warn', s:'Set your shooting elbow near 90 degrees so the ball sits ready above your shooting eye.'});
+  if (balDev > 0.12) fb.push({t:'warn', s:'Square up and keep your base balanced. Shoot straight up and land in the same spot you took off from.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Excellent shooting form! Elbow aligned under the ball with smooth, balanced mechanics.'});
+    fb.push({t:'ok', s:'Repeat that exact release and follow-through every rep — consistency is what builds a reliable jumper.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── FOOTBALL THROW ──
+function analyzeFootballThrow(lm, variation) {
+  const leftUp = lm[LM.L_WRIST].y < lm[LM.R_WRIST].y;
+  const sh = lm[leftUp ? LM.L_SHOULDER : LM.R_SHOULDER];
+  const el = lm[leftUp ? LM.L_ELBOW    : LM.R_ELBOW];
+  const wr = lm[leftUp ? LM.L_WRIST    : LM.R_WRIST];
+  const elbAng  = angle(sh, el, wr);
+  const release = Math.abs(wr.x - sh.x) > 0.18;   // hand extended away from body
+
+  // 1. Arm slot — elbow at/above shoulder height (avoid sidearm)
+  const drop = el.y - sh.y;                        // >0 means elbow below shoulder
+  const armScore = drop <= 0.04 ? 100 : drop <= 0.12 ? 76 : drop <= 0.20 ? 50 : 32;
+  const armNote  = drop <= 0.04 ? 'Elbow up at shoulder height'
+                 : drop <= 0.12 ? 'Raise the elbow slightly' : 'Elbow dropping — avoid sidearm';
+
+  // 2. Elbow angle (cocked ~100°, extends through release)
+  const elbScore = release ? scoreAngle(elbAng, 150, 25) : scoreAngle(elbAng, 100, 30);
+  const elbNote  = release ? 'Extending through the throw' : 'Good cocked position';
+
+  // 3. Stride / base toward target
+  const ratio = Math.abs(lm[LM.L_ANKLE].x - lm[LM.R_ANKLE].x) / (Math.abs(lm[LM.L_SHOULDER].x - lm[LM.R_SHOULDER].x) || 0.2);
+  const strideScore = ratio < 0.6 ? 48 : ratio < 1.0 ? 74 : ratio <= 2.3 ? 100 : 78;
+  const strideNote  = ratio < 0.8 ? 'Step into the throw — widen your base' : 'Strong stride toward target';
+
+  // 4. Balance — not leaning back
+  const lean = torsoLean(lm);
+  const balScore = lean < 22 ? 100 : lean < 34 ? 72 : 45;
+  const balNote  = lean > 34 ? 'Avoid leaning back — stay over front foot' : 'Good upper-body posture';
+
+  const breakdown = {
+    arm:    {name:'Arm Slot',      score:Math.round(armScore),    weight:.30, note:armNote},
+    elbow:  {name:'Elbow Angle',   score:Math.round(elbScore),    weight:.25, note:elbNote},
+    stride: {name:'Stride / Base', score:Math.round(strideScore), weight:.25, note:strideNote},
+    balance:{name:'Balance',       score:Math.round(balScore),    weight:.20, note:balNote},
+  };
+
+  const fb = [];
+  if (drop > 0.12) fb.push({t:'bad', s:'Your throwing elbow is dropping below your shoulder. Keep it up near shoulder height and throw over the top for a tighter spiral.'});
+  if (ratio < 0.8) fb.push({t:'warn', s:'Step toward your target as you throw. A strong front-foot stride transfers power from your legs and hips into the ball.'});
+  if (lean > 34)   fb.push({t:'warn', s:'You are leaning back. Stay tall over your front foot and rotate hips and shoulders through the throw for velocity.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Great throwing motion! Arm slot is over the top and you are striding into the throw with good balance.'});
+    fb.push({t:'ok', s:'Drive with your hips, point your lead shoulder at the target, and follow through across your body for max power.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── SOCCER KICK ──
+function analyzeSoccerKick(lm, variation) {
+  // Kicking leg = the foot that is higher off the ground (smaller y)
+  const leftKick = lm[LM.L_ANKLE].y < lm[LM.R_ANKLE].y;
+  const kHip = lm[leftKick ? LM.L_HIP   : LM.R_HIP];
+  const kKnee= lm[leftKick ? LM.L_KNEE  : LM.R_KNEE];
+  const kAnk = lm[leftKick ? LM.L_ANKLE : LM.R_ANKLE];
+  const pHip = lm[leftKick ? LM.R_HIP   : LM.L_HIP];
+  const pKnee= lm[leftKick ? LM.R_KNEE  : LM.L_KNEE];
+  const pAnk = lm[leftKick ? LM.R_ANKLE : LM.L_ANKLE];
+
+  const kKneeAng = angle(kHip, kKnee, kAnk);
+  const pKneeAng = angle(pHip, pKnee, pAnk);
+
+  // 1. Plant leg — firm, slight flex
+  const plantScore = scoreAngle(pKneeAng, 158, 22);
+  const plantNote  = pKneeAng < 130 ? 'Plant leg over-bent'
+                   : pKneeAng > 178 ? 'Bend plant knee slightly' : 'Stable plant leg';
+
+  // 2. Kicking leg — reward loaded backswing OR full extension
+  const kickScore = Math.max(scoreAngle(kKneeAng, 72, 30), scoreAngle(kKneeAng, 165, 28));
+  const kickNote  = kKneeAng < 110 ? 'Loaded backswing — snap through'
+                  : kKneeAng > 150 ? 'Good extension through the ball' : 'Drive the knee, snap the lower leg';
+
+  // 3. Body balance — arms out, moderate lean over plant
+  const armRatio = Math.abs(lm[LM.L_WRIST].x - lm[LM.R_WRIST].x) / (Math.abs(lm[LM.L_SHOULDER].x - lm[LM.R_SHOULDER].x) || 0.2);
+  const lean = torsoLean(lm);
+  let balScore = 60;
+  balScore += armRatio > 1.0 ? 20 : armRatio > 0.7 ? 10 : 0;
+  balScore += (lean >= 8 && lean <= 34) ? 20 : (lean < 45 ? 8 : 0);
+  balScore = clamp(balScore, 0, 100);
+  const balNote = armRatio < 0.7 ? 'Spread arms for balance' : (lean < 6 ? 'Lean slightly over the ball' : 'Good balance');
+
+  // 4. Hip drive on kicking leg
+  const kHipAng = angle(lm[leftKick ? LM.L_SHOULDER : LM.R_SHOULDER], kHip, kKnee);
+  const hipScore = scoreAngle(kHipAng, 120, 40);
+
+  const breakdown = {
+    plant:  {name:'Plant Leg',    score:Math.round(plantScore), weight:.25, note:plantNote},
+    kick:   {name:'Kicking Leg',  score:Math.round(kickScore),  weight:.30, note:kickNote},
+    balance:{name:'Body Balance', score:Math.round(balScore),   weight:.25, note:balNote},
+    hip:    {name:'Hip Drive',    score:Math.round(hipScore),   weight:.20},
+  };
+
+  const fb = [];
+  if (pKneeAng < 130) fb.push({t:'warn', s:'Your plant leg is buckling. Keep the support knee firm with your plant foot pointed at your target beside the ball.'});
+  if (kKneeAng > 110 && kKneeAng < 150) fb.push({t:'warn', s:'Generate more power: load a bigger backswing, then snap your lower leg through the ball with a locked ankle.'});
+  if (armRatio < 0.7) fb.push({t:'warn', s:'Open your arms out for balance — they act as a counterweight so you can swing your leg hard without falling off line.'});
+  if (lean < 6 && variation !== 'chip') fb.push({t:'warn', s:'Lean slightly over the ball at contact to keep your shot driving low and on target instead of ballooning over.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0) {
+    fb.push({t:'ok', s:'Excellent kicking technique! Solid plant leg, strong leg drive, and good balance through contact.'});
+    fb.push({t:'ok', s:'Follow through toward your target and let your kicking leg finish high for power and accuracy.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── TENNIS SWING ──
+function analyzeTennisSwing(lm, variation){
+  const avgKnee = (angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]) + angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])) / 2;
+  const hipMid = mid(lm[LM.L_HIP], lm[LM.R_HIP]);
+  const ankMid = mid(lm[LM.L_ANKLE], lm[LM.R_ANKLE]);
+
+  // 1. Athletic ready stance
+  const stanceScore = scoreAngle(avgKnee, 150, 32);
+  const stanceNote = avgKnee > 168 ? 'Bend your knees into a ready position' : avgKnee < 110 ? 'Too low' : 'Good athletic base';
+
+  // 2. Balance over base
+  const balDev = Math.abs(hipMid.x - ankMid.x);
+  const balScore = balDev < 0.06 ? 100 : balDev < 0.12 ? 80 : balDev < 0.20 ? 55 : 35;
+  const balNote = balDev < 0.06 ? 'Well balanced' : 'Stay balanced over your base';
+
+  // 3. Shoulder turn (coil)
+  const shAng  = Math.atan2(lm[LM.R_SHOULDER].y - lm[LM.L_SHOULDER].y, lm[LM.R_SHOULDER].x - lm[LM.L_SHOULDER].x) * 180/Math.PI;
+  const hipAng = Math.atan2(lm[LM.R_HIP].y - lm[LM.L_HIP].y, lm[LM.R_HIP].x - lm[LM.L_HIP].x) * 180/Math.PI;
+  let sep = Math.abs(shAng - hipAng); if (sep > 180) sep = 360 - sep;
+  const turnScore = scoreAngle(sep, 25, 22);
+  const turnNote = sep < 8 ? 'Turn your shoulders to coil' : 'Good shoulder turn';
+
+  // 4. Swing extension at contact (more-extended arm)
+  const ext = Math.max(angle(lm[LM.L_SHOULDER],lm[LM.L_ELBOW],lm[LM.L_WRIST]), angle(lm[LM.R_SHOULDER],lm[LM.R_ELBOW],lm[LM.R_WRIST]));
+  const extScore = scoreAngle(ext, 165, 30);
+  const extNote = ext < 130 ? 'Extend your arm through contact' : 'Good extension';
+
+  const breakdown = {
+    stance: {name:'Athletic Stance', score:Math.round(stanceScore), weight:.25, note:stanceNote},
+    balance:{name:'Balance',         score:Math.round(balScore),    weight:.25, note:balNote},
+    turn:   {name:'Shoulder Turn',   score:Math.round(turnScore),   weight:.25, note:turnNote},
+    ext:    {name:'Swing Extension', score:Math.round(extScore),    weight:.25, note:extNote},
+  };
+
+  const fb = [];
+  if (avgKnee > 168) fb.push({t:'warn', s:'Stay in an athletic, knees-bent ready position so you can explode into the shot and recover quickly.'});
+  if (balDev > 0.12) fb.push({t:'bad',  s:'You are off balance. Keep your weight centered and step into the shot rather than reaching for the ball.'});
+  if (sep < 8)       fb.push({t:'warn', s:'Prepare earlier — turn your shoulders and coil your torso so you can unwind into the ball for power.'});
+  if (ext < 130)     fb.push({t:'warn', s:'Make contact out in front with your arm extending through the ball, then follow through over your shoulder.'});
+  if (fb.filter(f => f.t !== 'ok').length === 0){
+    fb.push({t:'ok', s:'Great swing! Balanced athletic base, good shoulder turn, and strong extension through contact.'});
+    fb.push({t:'ok', s:'Keep meeting the ball out in front and finishing your follow-through high and smooth.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── GOLF SWING ──
+function analyzeGolfSwing(lm, variation){
+  const avgKnee = (angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]) + angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])) / 2;
+  const hipMid = mid(lm[LM.L_HIP], lm[LM.R_HIP]);
+  const ankMid = mid(lm[LM.L_ANKLE], lm[LM.R_ANKLE]);
+  const lean = torsoLean(lm);
+
+  // 1. Posture (hip hinge / spine angle)
+  const postScore = scoreAngle(lean, 28, 18);
+  const postNote = lean < 12 ? 'Hinge more from the hips' : lean > 48 ? 'Too bent over' : 'Good spine angle';
+
+  // 2. Knee flex
+  const kneeScore = scoreAngle(avgKnee, 158, 22);
+  const kneeNote = avgKnee > 175 ? 'Soften your knees' : avgKnee < 135 ? 'Too much knee bend' : 'Athletic knee flex';
+
+  // 3. Balance (no sway)
+  const balDev = Math.abs(hipMid.x - ankMid.x);
+  const balScore = balDev < 0.06 ? 100 : balDev < 0.12 ? 80 : balDev < 0.20 ? 55 : 35;
+  const balNote = balDev < 0.06 ? 'Centered & balanced' : 'Stay centered — avoid swaying';
+
+  // 4. Shoulder turn
+  const shAng  = Math.atan2(lm[LM.R_SHOULDER].y - lm[LM.L_SHOULDER].y, lm[LM.R_SHOULDER].x - lm[LM.L_SHOULDER].x) * 180/Math.PI;
+  const hipAng = Math.atan2(lm[LM.R_HIP].y - lm[LM.L_HIP].y, lm[LM.R_HIP].x - lm[LM.L_HIP].x) * 180/Math.PI;
+  let sep = Math.abs(shAng - hipAng); if (sep > 180) sep = 360 - sep;
+  const turnScore = scoreAngle(sep, 28, 24);
+  const turnNote = sep < 10 ? 'Make a fuller shoulder turn' : 'Good shoulder turn';
+
+  const breakdown = {
+    posture:{name:'Posture',       score:Math.round(postScore), weight:.28, note:postNote},
+    knee:   {name:'Knee Flex',     score:Math.round(kneeScore), weight:.22, note:kneeNote},
+    balance:{name:'Balance',       score:Math.round(balScore),  weight:.25, note:balNote},
+    turn:   {name:'Shoulder Turn', score:Math.round(turnScore), weight:.25, note:turnNote},
+  };
+
+  const fb = [];
+  if (lean < 12)     fb.push({t:'warn', s:'Set up with more hip hinge — tilt forward from your hips with a flat back so your arms hang under your shoulders.'});
+  if (lean > 48)     fb.push({t:'warn', s:'You are bent over too far. Stand a touch taller and keep a stable spine angle throughout the swing.'});
+  if (balDev > 0.12) fb.push({t:'bad',  s:'Avoid swaying off the ball. Keep your weight centered and rotate around a stable spine for consistent contact.'});
+  if (sep < 10)      fb.push({t:'warn', s:'Make a fuller shoulder turn in the backswing to build power while keeping your lower body relatively stable.'});
+  if (fb.filter(f => f.t !== 'ok').length === 0){
+    fb.push({t:'ok', s:'Great swing posture! Solid hip hinge, athletic knee flex, a balanced base, and a full shoulder turn.'});
+    fb.push({t:'ok', s:'Keep your head steady and rotate around your spine — that consistency is what repeats good contact.'});
+  }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── TRICEP PUSHDOWN ──
+function analyzeTricepPushdown(lm) {
+  const ext = (angle(lm[LM.L_SHOULDER],lm[LM.L_ELBOW],lm[LM.L_WRIST]) + angle(lm[LM.R_SHOULDER],lm[LM.R_ELBOW],lm[LM.R_WRIST])) / 2;
+  const elbowDev = (Math.abs(lm[LM.L_ELBOW].x - lm[LM.L_SHOULDER].x) + Math.abs(lm[LM.R_ELBOW].x - lm[LM.R_SHOULDER].x)) / 2;
+  const lean = torsoLean(lm);
+  const breakdown = {
+    lockout: {name:'Elbow Lockout', score:Math.round(scoreAngle(ext,170,30)), weight:.4,  note: ext>150?'Full extension':'Extend fully at the bottom'},
+    pin:     {name:'Elbows Pinned', score:Math.round(elbowDev<0.06?100:elbowDev<0.12?75:50), weight:.35, note: elbowDev<0.06?'Elbows tight to torso':'Keep elbows pinned to your sides'},
+    posture: {name:'Posture',       score:Math.round(lean<12?100:lean<22?75:50), weight:.25, note: lean<12?'Stable upright torso':'Avoid swinging the torso'},
+  };
+  const fb = [];
+  if (ext < 150) fb.push({t:'warn', s:'Extend your elbows fully at the bottom and squeeze the triceps — don’t cut the rep short.'});
+  if (elbowDev > 0.12) fb.push({t:'bad', s:'Keep your elbows pinned to your sides; let only the forearms move so the triceps do the work.'});
+  if (lean > 22) fb.push({t:'warn', s:'Stop leaning and swinging — keep your torso upright so the triceps do the lifting.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0){ fb.push({t:'ok', s:'Great pulldown! Full lockout, elbows tight, and a stable torso.'}); fb.push({t:'ok', s:'Control the weight back up and keep tension on the triceps.'}); }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── BULGARIAN SPLIT SQUAT ──
+function analyzeBulgarianSplitSquat(lm) {
+  const front = Math.min(angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]), angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE]));
+  const lean = torsoLean(lm);
+  const balDev = Math.abs(mid(lm[LM.L_HIP],lm[LM.R_HIP]).x - mid(lm[LM.L_ANKLE],lm[LM.R_ANKLE]).x);
+  const breakdown = {
+    depth:   {name:'Front Knee Depth', score:Math.round(scoreAngle(front,95,25)), weight:.4, note: front>120?'Sink a little deeper':front<70?'Very deep':'Good depth (~90°)'},
+    posture: {name:'Torso Lean',       score:Math.round(lean<28?100:lean<42?72:48), weight:.3, note: lean<28?'Good slight forward lean':'Too much forward lean'},
+    balance: {name:'Balance',          score:Math.round(balDev<0.08?100:balDev<0.16?72:48), weight:.3, note: balDev<0.08?'Stable on the front leg':'Stay balanced over the front foot'},
+  };
+  const fb = [];
+  if (front > 120) fb.push({t:'warn', s:'Lower until your front thigh is about parallel — let the front knee bend toward 90 degrees.'});
+  if (lean > 42) fb.push({t:'bad', s:'You are folding forward. Keep a tall, slightly-forward torso and drive through the front heel.'});
+  if (balDev > 0.16) fb.push({t:'warn', s:'Keep most of your weight on the front leg; the rear foot is just for balance.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0){ fb.push({t:'ok', s:'Excellent split squat! Good depth, upright torso, and solid balance.'}); fb.push({t:'ok', s:'Drive through the front heel to stand and keep the rear foot light.'}); }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── SEATED ROW ──
+function analyzeSeatedRow(lm) {
+  const elb = (angle(lm[LM.L_SHOULDER],lm[LM.L_ELBOW],lm[LM.L_WRIST]) + angle(lm[LM.R_SHOULDER],lm[LM.R_ELBOW],lm[LM.R_WRIST])) / 2;
+  const lean = torsoLean(lm);
+  const breakdown = {
+    pull:    {name:'Pull (Elbow Drive)', score:Math.round(scoreAngle(elb,80,30)), weight:.4, note: elb<100?'Good pull to the torso':'Pull the handle to your torso'},
+    back:    {name:'Torso Control',      score:Math.round(lean<25?100:lean<40?70:45), weight:.35, note: lean<25?'Tall, controlled torso':'Avoid heaving back with the torso'},
+    squeeze: {name:'Shoulder Blades',    score:Math.round(elb<110?90:65), weight:.25, note:'Squeeze your shoulder blades together'},
+  };
+  const fb = [];
+  if (elb > 100) fb.push({t:'warn', s:'Pull the handle all the way to your torso, driving the elbows back and squeezing your shoulder blades.'});
+  if (lean > 40) fb.push({t:'bad', s:'Stop rocking back with your torso — keep it tall and let your back do the work.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0){ fb.push({t:'ok', s:'Great seated row! Strong elbow drive, tall posture, and a good scapular squeeze.'}); fb.push({t:'ok', s:'Control the handle back to a full stretch without rounding your back.'}); }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── PULL-UP ──
+function analyzePullUp(lm) {
+  const lE = angle(lm[LM.L_SHOULDER],lm[LM.L_ELBOW],lm[LM.L_WRIST]);
+  const rE = angle(lm[LM.R_SHOULDER],lm[LM.R_ELBOW],lm[LM.R_WRIST]);
+  const elb = (lE + rE) / 2, sym = Math.abs(lE - rE), lean = torsoLean(lm);
+  const breakdown = {
+    rom:      {name:'Pull Height (ROM)', score:Math.round(scoreAngle(elb,70,35)), weight:.45, note: elb<90?'Chin over the bar — full pull':'Pull higher — chin toward the bar'},
+    control:  {name:'Body Control',      score:Math.round(lean<15?100:lean<28?70:45), weight:.3, note: lean<15?'Minimal swing':'Reduce swinging / kipping'},
+    symmetry: {name:'Symmetry',          score:Math.round(sym<12?100:sym<25?72:50), weight:.25, note: sym<12?'Even pull both sides':'Pull evenly with both arms'},
+  };
+  const fb = [];
+  if (elb > 90) fb.push({t:'warn', s:'Pull until your chin clears the bar, then lower under control to a full dead hang.'});
+  if (lean > 28) fb.push({t:'bad', s:'Cut the swinging — keep your core tight and pull in a straight line instead of kipping.'});
+  if (sym > 25) fb.push({t:'warn', s:'You are pulling unevenly. Drive both elbows down together so one side doesn’t dominate.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0){ fb.push({t:'ok', s:'Strong pull-up! Full range to the bar, controlled body, and an even pull.'}); fb.push({t:'ok', s:'Lower all the way to a dead hang each rep for full range.'}); }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ── SIT-UP ──
+function analyzeSitUp(lm) {
+  const hipAng = (angle(lm[LM.L_SHOULDER],lm[LM.L_HIP],lm[LM.L_KNEE]) + angle(lm[LM.R_SHOULDER],lm[LM.R_HIP],lm[LM.R_KNEE])) / 2;
+  const knee = (angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]) + angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])) / 2;
+  const breakdown = {
+    rom:   {name:'Curl Range', score:Math.round(scoreAngle(hipAng,80,35)), weight:.55, note: hipAng<100?'Good full sit-up':'Curl all the way up'},
+    knees: {name:'Knee Bend',  score:Math.round(scoreAngle(knee,100,30)), weight:.45, note: (knee>70&&knee<130)?'Knees bent to protect the back':'Bend your knees ~90°'},
+  };
+  const fb = [];
+  if (hipAng > 110) fb.push({t:'warn', s:'Curl your torso all the way up toward your knees, rounding through the spine instead of just lifting your head.'});
+  if (knee > 140 || knee < 60) fb.push({t:'warn', s:'Keep your knees bent around 90 degrees with feet planted to protect your lower back.'});
+  if (fb.filter(f=>f.t!=='ok').length === 0){ fb.push({t:'ok', s:'Nice sit-up! Full curl with knees bent and feet planted.'}); fb.push({t:'ok', s:'Lower back down with control rather than dropping.'}); }
+  return { score: weightedScore(breakdown), breakdown, feedback: fb };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEIGHTED SCORE HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+function weightedScore(bd) {
+  const total = Object.values(bd).reduce((s, i) => s + i.score * i.weight, 0);
+  return Math.round(clamp(total, 0, 100));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// READINESS GATE — only grade when the joints needed for the exercise are in frame
+// ─────────────────────────────────────────────────────────────────────────────
+const JOINT_GROUPS = {
+  head:      { name:'Head',      lms:[LM.NOSE] },
+  shoulders: { name:'Shoulders', lms:[LM.L_SHOULDER, LM.R_SHOULDER] },
+  elbows:    { name:'Elbows',    lms:[LM.L_ELBOW, LM.R_ELBOW] },
+  wrists:    { name:'Wrists',    lms:[LM.L_WRIST, LM.R_WRIST] },
+  hips:      { name:'Hips',      lms:[LM.L_HIP, LM.R_HIP] },
+  knees:     { name:'Knees',     lms:[LM.L_KNEE, LM.R_KNEE] },
+  ankles:    { name:'Ankles',    lms:[LM.L_ANKLE, LM.R_ANKLE] },
+};
+
+// A landmark counts as "in frame" if its coords are within the view bounds and
+// MediaPipe assigns it at least minimal visibility (filters out hallucinations).
+function lmInFrame(p) {
+  return !!p && (p.visibility ?? 0) >= 0.25 &&
+         p.x > -0.02 && p.x < 1.02 && p.y > -0.02 && p.y < 1.02;
+}
+
+function checkReadiness(lm, req) {
+  const present = [], missing = [], missingNames = [], missingLms = [];
+  req.forEach(key => {
+    const g = JOINT_GROUPS[key];
+    const allIn = g.lms.every(i => lmInFrame(lm[i]));
+    if (allIn) {
+      present.push(key);
+    } else {
+      missing.push(key);
+      missingNames.push(g.name.toLowerCase());
+      g.lms.forEach(i => { if (!lmInFrame(lm[i])) missingLms.push(i); });
+    }
+  });
+  return { ready: missing.length === 0, present, missing, missingNames, missingLms };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXERCISE CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
+const EXERCISES = {
+  squat:     { name:'Squat',          tip:'Face the camera or stand slightly sideways. Feet shoulder-width apart.', fn:analyzeSquat, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'standard',n:'Standard Squat'},{id:'goblet',n:'Goblet Squat'},{id:'front',n:'Front Squat'},{id:'lowbar',n:'Low Bar Squat'},{id:'sumo',n:'Sumo Squat'},{id:'quarter',n:'Quarter Squat'},{id:'half',n:'Half Squat'},{id:'pause',n:'Pause Squat'},{id:'box',n:'Box Squat'}]},
+  lunge:     { name:'Lunge',          tip:'Face the camera directly. Keep your core tight and torso tall.', fn:analyzeLunge, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'forward',n:'Forward Lunge'},{id:'reverse',n:'Reverse Lunge'},{id:'walking',n:'Walking Lunge'},{id:'lateral',n:'Lateral Lunge'},{id:'curtsy',n:'Curtsy Lunge'},{id:'deficit',n:'Deficit Lunge'}]},
+  pushup:    { name:'Push-Up',        tip:'Camera at floor level to the side gives the best body-line analysis.', fn:analyzePushup, req:['shoulders','elbows','wrists','hips','ankles'],
+    vars:[{id:'standard',n:'Standard Push-Up'},{id:'wide',n:'Wide Grip'},{id:'diamond',n:'Diamond / Close Grip'},{id:'incline',n:'Incline Push-Up'},{id:'decline',n:'Decline Push-Up'},{id:'archer',n:'Archer Push-Up'},{id:'pike',n:'Pike Push-Up'}]},
+  deadlift:  { name:'Deadlift',       tip:'Side view strongly recommended — front view limits back-rounding detection.', fn:analyzeDeadlift, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'conventional',n:'Conventional'},{id:'sumo',n:'Sumo Deadlift'},{id:'romanian',n:'Romanian (RDL)'},{id:'stiff_leg',n:'Stiff Leg'},{id:'trap_bar',n:'Trap Bar'},{id:'deficit',n:'Deficit Deadlift'}]},
+  ohp:       { name:'Overhead Press', tip:'Face the camera or slightly sideways. Keep feet shoulder-width.', fn:analyzeOHP, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'standing',n:'Standing Barbell'},{id:'seated',n:'Seated OHP'},{id:'dumbbell',n:'Dumbbell Press'},{id:'arnold',n:'Arnold Press'},{id:'push_press',n:'Push Press'},{id:'behind_neck',n:'Behind-the-Neck Press'}]},
+  curl:      { name:'Bicep Curl',     tip:'Stand facing the camera with arms hanging naturally at your sides.', fn:analyzeCurl, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'standard',n:'Standard Curl'},{id:'hammer',n:'Hammer Curl'},{id:'concentration',n:'Concentration Curl'},{id:'incline',n:'Incline Curl'},{id:'cable',n:'Cable Curl'},{id:'preacher',n:'Preacher Curl'},{id:'21s',n:'21s'}]},
+  row:       { name:'Bent-Over Row',  tip:'Standing sideways to the camera helps track your torso hinge angle.', fn:analyzeBentOverRow, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'barbell',n:'Barbell Row'},{id:'dumbbell',n:'Dumbbell Row'},{id:'cable',n:'Cable Row'},{id:'yates',n:"Yates Row"},{id:'pendlay',n:'Pendlay Row'},{id:'tbar',n:'T-Bar Row'}]},
+  bench:     { name:'Bench Press',    tip:'Side view recommended for bar path and arch. Front view gives limited data.', fn:analyzeBenchPress, req:['shoulders','elbows','wrists'],
+    vars:[{id:'standard',n:'Standard Bench'},{id:'incline',n:'Incline Press'},{id:'decline',n:'Decline Press'},{id:'close_grip',n:'Close Grip'},{id:'dumbbell',n:'Dumbbell Press'},{id:'floor',n:'Floor Press'},{id:'wide',n:'Wide Grip'}]},
+  plank:     { name:'Plank',          tip:'Camera to the side at floor level gives the best body-line view.', fn:analyzePlank, req:['shoulders','elbows','wrists','hips','ankles'],
+    vars:[{id:'forearm',n:'Forearm Plank'},{id:'extended',n:'Extended Arm Plank'},{id:'side',n:'Side Plank'},{id:'rkg',n:'RKC Plank'},{id:'body_saw',n:'Body Saw Plank'}]},
+  glute:     { name:'Glute Bridge',   tip:'Lie on the floor facing up. Camera positioned to the side works best.', fn:analyzeGluteBridge, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'standard',n:'Glute Bridge'},{id:'single',n:'Single Leg Bridge'},{id:'barbell',n:'Barbell Hip Thrust'},{id:'banded',n:'Banded Bridge'},{id:'elevated',n:'Elevated Bridge'}]},
+  tricep:    { name:'Tricep Pulldown', tip:'Stand tall facing the camera. Keep your elbows pinned to your sides.', fn:analyzeTricepPushdown, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'bar',n:'Straight Bar'},{id:'rope',n:'Rope'},{id:'vbar',n:'V-Bar'},{id:'single',n:'Single-Arm'},{id:'reverse',n:'Reverse-Grip'}]},
+  bulgarian: { name:'Bulgarian Split Squat', tip:'Stand side-on to the camera with your rear foot raised on a bench behind you.', fn:analyzeBulgarianSplitSquat, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'bodyweight',n:'Bodyweight'},{id:'dumbbell',n:'Dumbbell'},{id:'barbell',n:'Barbell'},{id:'goblet',n:'Goblet'},{id:'deficit',n:'Deficit'}]},
+  seatedrow: { name:'Seated Row', tip:'Sit side-on to the camera so your torso and arms are in frame.', fn:analyzeSeatedRow, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'cable',n:'Cable Row'},{id:'wide',n:'Wide Grip'},{id:'close',n:'Close Grip'},{id:'machine',n:'Machine Row'},{id:'single',n:'Single-Arm'}]},
+  pullup:    { name:'Pull-Up', tip:'Stand under a bar facing the camera so your arms and torso stay in frame.', fn:analyzePullUp, req:['shoulders','elbows','wrists','hips'],
+    vars:[{id:'standard',n:'Pull-Up'},{id:'chin',n:'Chin-Up'},{id:'wide',n:'Wide Grip'},{id:'neutral',n:'Neutral Grip'},{id:'assisted',n:'Assisted'}]},
+  situp:     { name:'Sit-Up', tip:'Lie on the floor side-on to the camera with your knees bent.', fn:analyzeSitUp, req:['shoulders','hips','knees','ankles'],
+    vars:[{id:'standard',n:'Sit-Up'},{id:'crunch',n:'Crunch'},{id:'weighted',n:'Weighted'},{id:'twist',n:'Twisting Sit-Up'},{id:'decline',n:'Decline'}]},
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function scoreColor(s) {
+  if (s >= 87) return '#00e87a';
+  if (s >= 73) return '#88ee00';
+  if (s >= 58) return '#ffcc00';
+  if (s >= 42) return '#ff8800';
+  return '#ff4455';
+}
+
+function scoreGrade(s) {
+  if (s >= 90) return 'Excellent';
+  if (s >= 80) return 'Good';
+  if (s >= 68) return 'Fair';
+  if (s >= 55) return 'Needs Work';
+  if (s >= 40) return 'Poor';
+  return 'Critical';
+}
+
+const CIRC = 2 * Math.PI * 66; // ~414.7
+
+let smoothed = 50;
+let needsReset = false;   // snap (don't smooth) the first graded frame after a waiting period
+
+function updateScore(score, breakdown) {
+  if (needsReset) { smoothed = score; needsReset = false; }
+  else smoothed = smoothed * 0.7 + score * 0.3;
+  const d = Math.round(smoothed);
+  const col = scoreColor(d);
+  const ring = document.getElementById('scoreRing');
+  const num  = document.getElementById('scoreNum');
+  const grade= document.getElementById('scoreGrade');
+
+  num.textContent = d;
+  num.style.color = col;
+  grade.textContent = scoreGrade(d);
+  ring.style.stroke = col;
+  ring.style.strokeDashoffset = CIRC * (1 - d/100);
+
+  const list = document.getElementById('bdList');
+  list.innerHTML = '';
+  Object.values(breakdown).forEach(item => {
+    const c = scoreColor(item.score);
+    const el = document.createElement('div');
+    el.className = 'bd-item';
+    el.innerHTML =
+      `<div class="bd-header"><span>${item.name}</span><span style="color:${c}">${item.score}</span></div>` +
+      `<div class="bd-track"><div class="bd-fill" style="width:${item.score}%;background:${c}"></div></div>` +
+      (item.note ? `<div class="bd-note">${item.note}</div>` : '');
+    list.appendChild(el);
+  });
+}
+
+// Feedback persists on screen: it is only swapped when the advice genuinely
+// changes, and even then no more often than FB_MIN_INTERVAL — so messages stay
+// long enough to read and never blink out frame-to-frame.
+let lastFbSig = '';
+let lastFbRender = 0;
+const FB_MIN_INTERVAL = 1600; // ms a message is guaranteed to stay before it can change
+
+function updateFeedback(fb) {
+  if (!fb || fb.length === 0) return;                 // never blank the panel
+  const sig = fb.map(i => i.t + '|' + i.s).join('§');
+  if (sig === lastFbSig) return;                      // same advice → leave it untouched
+  const now = performance.now();
+  if (lastFbSig !== '' && now - lastFbRender < FB_MIN_INTERVAL) return; // hold current advice longer
+
+  lastFbSig = sig;
+  lastFbRender = now;
+
+  const list = document.getElementById('fbList');
+  list.innerHTML = '';
+  const map = { ok:'✓', warn:'!', bad:'✗' };
+  fb.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'fb-item';
+    el.innerHTML =
+      `<div class="fb-icon ${item.t}">${map[item.t]}</div>` +
+      `<span class="fb-text">${item.s}</span>`;
+    list.appendChild(el);
+  });
+}
+
+// Shown instead of a grade while required joints are missing from the frame
+function showWaiting(readiness, cfg) {
+  needsReset = true;
+  const num   = document.getElementById('scoreNum');
+  const ring  = document.getElementById('scoreRing');
+  const grade = document.getElementById('scoreGrade');
+  num.textContent = '--';
+  num.style.color = '#6666aa';
+  ring.style.stroke = '#6666aa';
+  ring.style.strokeDashoffset = CIRC;            // ring drawn empty
+  grade.textContent = 'Waiting — get in frame';
+
+  // Breakdown panel becomes a live checklist of required body parts
+  const list = document.getElementById('bdList');
+  list.innerHTML = '<div class="card-sub">Required body parts in frame</div>';
+  cfg.req.forEach(key => {
+    const g  = JOINT_GROUPS[key];
+    const ok = readiness.present.includes(key);
+    const el = document.createElement('div');
+    el.className = 'check-item';
+    el.innerHTML =
+      `<span class="check-dot ${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span>` +
+      `<span class="check-name">${g.name}</span>` +
+      `<span class="check-status">${ok ? 'detected' : 'not visible'}</span>`;
+    list.appendChild(el);
+  });
+
+  // NOTE: the feedback panel is intentionally left untouched here so previously
+  // given coaching stays on screen while you reposition. What's missing is shown
+  // by the checklist above, the camera label, and the status bar.
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SKELETON DRAWING
+// ─────────────────────────────────────────────────────────────────────────────
+const CONNECTIONS = [
+  [LM.L_EAR,LM.L_SHOULDER],[LM.R_EAR,LM.R_SHOULDER],
+  [LM.L_SHOULDER,LM.R_SHOULDER],
+  [LM.L_SHOULDER,LM.L_ELBOW],[LM.L_ELBOW,LM.L_WRIST],
+  [LM.R_SHOULDER,LM.R_ELBOW],[LM.R_ELBOW,LM.R_WRIST],
+  [LM.L_SHOULDER,LM.L_HIP],[LM.R_SHOULDER,LM.R_HIP],
+  [LM.L_HIP,LM.R_HIP],
+  [LM.L_HIP,LM.L_KNEE],[LM.L_KNEE,LM.L_ANKLE],
+  [LM.R_HIP,LM.R_KNEE],[LM.R_KNEE,LM.R_ANKLE],
+];
+
+const KEY_JOINTS = [
+  LM.NOSE,
+  LM.L_SHOULDER,LM.R_SHOULDER,
+  LM.L_ELBOW,LM.R_ELBOW,
+  LM.L_WRIST,LM.R_WRIST,
+  LM.L_HIP,LM.R_HIP,
+  LM.L_KNEE,LM.R_KNEE,
+  LM.L_ANKLE,LM.R_ANKLE,
+];
+
+const JOINT_LABELS = {
+  [LM.NOSE]:'Head',
+  [LM.L_SHOULDER]:'L. Shoulder',[LM.R_SHOULDER]:'R. Shoulder',
+  [LM.L_ELBOW]:'L. Elbow',    [LM.R_ELBOW]:'R. Elbow',
+  [LM.L_WRIST]:'L. Wrist',    [LM.R_WRIST]:'R. Wrist',
+  [LM.L_HIP]:'L. Hip',        [LM.R_HIP]:'R. Hip',
+  [LM.L_KNEE]:'L. Knee',      [LM.R_KNEE]:'R. Knee',
+  [LM.L_ANKLE]:'L. Ankle',    [LM.R_ANKLE]:'R. Ankle',
+};
+
+function drawSkeleton(ctx, lm, w, h, col, missing) {
+  const missSet = missing ? new Set(missing) : null;
+  ctx.lineCap = 'round';
+
+  // Connections
+  CONNECTIONS.forEach(([i,j]) => {
+    const a = lm[i], b = lm[j];
+    if (!a || !b || a.visibility < 0.4 || b.visibility < 0.4) return;
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(a.x*w, a.y*h);
+    ctx.lineTo(b.x*w, b.y*h);
+    ctx.stroke();
+  });
+
+  // Joints
+  KEY_JOINTS.forEach(i => {
+    const p = lm[i];
+    if (!p || p.visibility < 0.4) return;
+    const px = p.x*w, py = p.y*h;
+    const jcol = (missSet && missSet.has(i)) ? '#ff4455' : col;
+    ctx.globalAlpha = 1;
+
+    // Glow
+    const grd = ctx.createRadialGradient(px,py,2,px,py,14);
+    grd.addColorStop(0, jcol+'44');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI*2);
+    ctx.fill();
+
+    // Dot
+    ctx.fillStyle = jcol;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  ctx.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POSE HANDLER
+// ─────────────────────────────────────────────────────────────────────────────
+let curExercise = 'squat';
+let curVariation = 'standard';
+
+function onResults(results) {
+  if (reportOpen) return;            // paused while the full-page summary is open
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Match canvas to video dimensions
+  canvas.width  = results.image.width;
+  canvas.height = results.image.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+
+  if (!results.poseLandmarks || results.poseLandmarks.length === 0) {
+    document.getElementById('statusDot').classList.remove('on');
+    document.getElementById('statusText').textContent = 'No person detected';
+    document.getElementById('camLabel').textContent = 'Stand in frame to begin';
+    lastTick = 0;                 // pause the hold timer while nobody is detected
+    return;
+  }
+
+  const lm  = results.poseLandmarks;
+  const cfg = EXERCISES[curExercise];
+
+  // GATE: don't grade until every joint this exercise needs is in frame
+  const readiness = checkReadiness(lm, cfg.req);
+  if (!readiness.ready) {
+    drawSkeleton(ctx, lm, canvas.width, canvas.height, '#ffaa00', readiness.missingLms);
+    document.getElementById('statusDot').classList.remove('on');
+    document.getElementById('statusText').textContent = 'Get fully in frame';
+    document.getElementById('camLabel').textContent =
+      'Move so your ' + readiness.missingNames.join(', ') + ' are in view';
+    lastTick = 0;                 // pause the hold timer while out of frame
+    showWaiting(readiness, cfg);
+    return;
+  }
+
+  document.getElementById('statusDot').classList.add('on');
+  document.getElementById('statusText').textContent = 'Tracking active';
+
+  let analysis;
+  try { analysis = cfg.fn(lm, curVariation); }
+  catch(e) { console.error(e); return; }
+
+  const col = scoreColor(analysis.score);
+  drawSkeleton(ctx, lm, canvas.width, canvas.height, col);
+
+  // Score label on canvas. The canvas is CSS-mirrored (scaleX(-1)) to match the
+  // selfie video, which would render this text backwards — so we mirror the text
+  // horizontally here to cancel that out and keep it readable.
+  const { width:w, height:h } = canvas;
+  ctx.save();
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.font = 'bold 22px Segoe UI';
+  ctx.textAlign = 'center';
+  const label = `Score: ${analysis.score}`;
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.roundRect(w/2 - tw/2 - 14, h - 52, tw + 28, 36, 10);
+  ctx.fill();
+  ctx.fillStyle = col;
+  ctx.fillText(label, w/2, h - 29);
+  ctx.restore();
+
+  updateScore(analysis.score, analysis.breakdown);
+  updateFeedback(analysis.feedback);
+  processRep(analysis.score, analysis.breakdown, lm);
+  renderStats();
+  document.getElementById('camLabel').textContent = `${cfg.name} – ${scoreGrade(analysis.score)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOVEMENT ICONS
+// ─────────────────────────────────────────────────────────────────────────────
+const ICONS = {
+  squat:'🏋️', lunge:'🦵', pushup:'🤸', deadlift:'🏋️', ohp:'🙆', curl:'💪',
+  row:'🚣', bench:'🛏️', plank:'🧘', glute:'🌉',
+  tricep:'💪', bulgarian:'🦵', seatedrow:'🚣', pullup:'🧗', situp:'🛌',
+};
+
+// Sub-categories shown when the "Gym" group is expanded
+const GYM_SUB_ORDER = ['Legs','Push','Pull','Core'];
+const GYM_SUBCATS = {
+  squat:'Legs', lunge:'Legs', glute:'Legs', bulgarian:'Legs',
+  pushup:'Push', bench:'Push', ohp:'Push', tricep:'Push',
+  deadlift:'Pull', row:'Pull', curl:'Pull', seatedrow:'Pull', pullup:'Pull',
+  plank:'Core', situp:'Core',
+};
+
+// Icons for the top-level sidebar groups (rendered larger than movement icons)
+const CAT_ICONS = { Gym:'🏋️' };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REP COUNTER + SESSION STATS
+// Each movement exposes a scalar "signal" (a joint angle) that makes ONE low→high
+// swing per rep. A rep is counted on that low→high transition, and the score at
+// the deepest point of the rep is logged for best / average tracking. Planks are
+// holds, so they accumulate time-in-good-form instead of counting reps.
+// ─────────────────────────────────────────────────────────────────────────────
+function avgAngle(lm,a,b,c,d,e,f){ return (angle(lm[a],lm[b],lm[c]) + angle(lm[d],lm[e],lm[f]))/2; }
+
+const REP_CONFIG = {
+  squat:    { sig: lm => avgAngle(lm, LM.L_HIP,LM.L_KNEE,LM.L_ANKLE, LM.R_HIP,LM.R_KNEE,LM.R_ANKLE), lo:120, hi:155 },
+  lunge:    { sig: lm => Math.min(angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]), angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])), lo:115, hi:155 },
+  pushup:   { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:100, hi:150 },
+  deadlift: { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_HIP,LM.L_KNEE, LM.R_SHOULDER,LM.R_HIP,LM.R_KNEE), lo:120, hi:160 },
+  ohp:      { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:100, hi:155 },
+  curl:     { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:70,  hi:150 },
+  row:      { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:80,  hi:150 },
+  bench:    { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:100, hi:150 },
+  glute:    { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_HIP,LM.L_KNEE, LM.R_SHOULDER,LM.R_HIP,LM.R_KNEE), lo:130, hi:162 },
+  plank:    { hold:true },
+  tricep:   { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:95,  hi:165 },
+  bulgarian:{ sig: lm => Math.min(angle(lm[LM.L_HIP],lm[LM.L_KNEE],lm[LM.L_ANKLE]), angle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE])), lo:110, hi:160 },
+  seatedrow:{ sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:85,  hi:150 },
+  pullup:   { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_ELBOW,LM.L_WRIST, LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST), lo:80,  hi:155 },
+  situp:    { sig: lm => avgAngle(lm, LM.L_SHOULDER,LM.L_HIP,LM.L_KNEE, LM.R_SHOULDER,LM.R_HIP,LM.R_KNEE), lo:80,  hi:140 },
+};
+
+const sessionStats = {};
+let repArmed = false, repDeepSig = Infinity, repDeepScore = 0, repDeepBreakdown = null;
+let holdTime = 0, lastTick = 0, lastHoldSample = 0;
+let sessionStart = performance.now();
+
+function statsFor(id){
+  return sessionStats[id] ||
+    (sessionStats[id] = {reps:0, sum:0, best:0, bestHold:0, scoreSum:0, scoreN:0, crit:{}, vars:{}});
+}
+function resetRepState(){ repArmed=false; repDeepSig=Infinity; repDeepScore=0; repDeepBreakdown=null; holdTime=0; lastTick=0; }
+
+// Fold one graded sample into a movement's running totals (used by the report)
+function logSample(st, score, breakdown, variation){
+  st.scoreSum += score; st.scoreN++;
+  if (variation) st.vars[variation] = (st.vars[variation] || 0) + 1;
+  if (breakdown){
+    Object.entries(breakdown).forEach(([k,item]) => {
+      const c = st.crit[k] || (st.crit[k] = {name:item.name, sum:0, n:0});
+      c.sum += item.score; c.n++;
+    });
+  }
+}
+
+function processRep(score, breakdown, lm){
+  const rc = REP_CONFIG[curExercise];
+  if (!rc) return;
+  const st = statsFor(curExercise);
+  const now = performance.now();
+
+  if (rc.hold){                                   // plank: accumulate good-form time
+    if (lastTick){
+      const dt = (now - lastTick) / 1000;
+      if (score >= 55){ holdTime += dt; if (holdTime > st.bestHold) st.bestHold = holdTime; }
+      else holdTime = 0;
+    }
+    lastTick = now;
+    if (now - lastHoldSample > 400){              // sample hold form ~2.5×/sec for the report
+      lastHoldSample = now;
+      logSample(st, score, breakdown, curVariation);
+    }
+    return;
+  }
+
+  lastTick = now;
+  const sig = rc.sig(lm);
+  if (sig < rc.lo){                               // at the bottom of the rep
+    repArmed = true;
+    if (sig < repDeepSig){ repDeepSig = sig; repDeepScore = score; repDeepBreakdown = breakdown; }
+  } else if (repArmed && sig > rc.hi){            // returned to the top → one rep
+    st.reps++; st.sum += repDeepScore;
+    if (repDeepScore > st.best) st.best = repDeepScore;
+    logSample(st, repDeepScore, repDeepBreakdown, curVariation);
+    repArmed = false; repDeepSig = Infinity; repDeepBreakdown = null;
+    flashRep();
+  }
+}
+
+function flashRep(){
+  const b = document.getElementById('repBadge');
+  if (!b) return;
+  b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+}
+
+function setStat(p, v, l){
+  document.getElementById(p+'-v').textContent = v;
+  document.getElementById(p+'-l').textContent = l;
+}
+function renderStats(){
+  const rc = REP_CONFIG[curExercise];
+  const st = statsFor(curExercise);
+  const num = document.getElementById('repNum');
+  const lbl = document.getElementById('repLbl');
+  const bV = document.getElementById('statB-v');
+  const cV = document.getElementById('statC-v');
+  if (rc && rc.hold){
+    setStat('statA', Math.floor(holdTime)+'s', 'Hold');
+    setStat('statB', Math.floor(st.bestHold)+'s', 'Best Hold');
+    setStat('statC', '—', 'Avg');
+    bV.style.color = ''; cV.style.color = '';
+    num.textContent = Math.floor(holdTime)+'s'; lbl.textContent = 'Hold';
+  } else {
+    const label = (rc && rc.label) || 'Reps';
+    const avg = st.reps ? Math.round(st.sum/st.reps) : 0;
+    setStat('statA', st.reps, label);
+    setStat('statB', st.best || '—', 'Best');
+    setStat('statC', st.reps ? avg : '—', 'Avg');
+    bV.style.color = st.best ? scoreColor(st.best) : '';
+    cV.style.color = st.reps ? scoreColor(avg) : '';
+    num.textContent = st.reps; lbl.textContent = label;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKOUT REPORT (full-page summary)
+// ─────────────────────────────────────────────────────────────────────────────
+let reportOpen = false;
+
+function fmtDur(ms){
+  const s = Math.max(0, Math.floor(ms/1000));
+  return Math.floor(s/60) + 'm ' + (s % 60) + 's';
+}
+
+function buildReportData(){
+  let scoreSum = 0, scoreN = 0, totalReps = 0, totalHold = 0;
+  const movements = [];
+  Object.entries(sessionStats).forEach(([id,st]) => {
+    const cfg = EXERCISES[id];
+    if (!cfg) return;
+    if (st.scoreN === 0 && !st.bestHold) return;            // skip movements with no data
+    const rc = REP_CONFIG[id];
+    const isHold = !!(rc && rc.hold);
+    const avg = st.scoreN ? Math.round(st.scoreSum / st.scoreN) : 0;
+    scoreSum += st.scoreSum; scoreN += st.scoreN;
+    totalReps += st.reps;
+    if (isHold) totalHold += st.bestHold;
+    const varNames = Object.keys(st.vars).map(v => (cfg.vars.find(x => x.id === v) || {}).n).filter(Boolean);
+    // best / worst form criterion for this movement (drives the coaching bullet)
+    const critList = Object.values(st.crit).filter(c => c.n).map(c => ({name:c.name, avg:Math.round(c.sum / c.n)}));
+    critList.sort((a,b) => b.avg - a.avg);
+    movements.push({ name:cfg.name, icon:ICONS[id]||'•', avg, reps:st.reps, best:st.best,
+      bestHold:st.bestHold, isHold, label:(rc && rc.label) || 'reps', varNames,
+      bestCrit:critList[0] || null, worstCrit:critList[critList.length - 1] || null });
+  });
+  const overall = scoreN ? Math.round(scoreSum / scoreN) : 0;
+  movements.sort((a,b) => b.avg - a.avg);
+  const wellMovements    = movements.filter(m => m.avg >= 78);
+  const improveMovements = movements.filter(m => m.avg < 78);
+  return { overall, totalReps, totalHold, movements, wellMovements, improveMovements, hasData: movements.length > 0 };
+}
+
+// Short actionable cue per form criterion (used in the "focus on" bullets)
+const CRIT_CUES = {
+  'Depth':'sink a little lower to reach full depth',
+  'Back Position':'keep your chest up and spine neutral',
+  'Knee Tracking':'drive your knees out over your toes',
+  'Symmetry':'keep both sides even and balanced',
+  'Front Knee Angle':'bend the front knee closer to 90°',
+  'Knee over Ankle':'keep your knee stacked over your ankle',
+  'Torso Position':'stay tall through your torso',
+  'Back Knee Depth':'lower your back knee further',
+  'Body Alignment':'hold a straight line from head to heels',
+  'Elbow Depth':'lower until your elbows reach about 90°',
+  'Elbow Position':'keep your elbows tucked instead of flaring',
+  'Hip Hinge':'push your hips back further',
+  'Lockout':'finish every rep with a full lockout',
+  'Wrist/Elbow Stack':'stack your wrists over your elbows',
+  'Core Stability':'brace your core so you stop leaning back',
+  'Range of Motion':'use a fuller range of motion',
+  'Body Stability':'cut the swinging and stay still',
+  'Hip Hinge Angle':'hinge further forward at the hips',
+  'Row Height':'pull your elbows up higher',
+  'Elbow Path':'keep your elbows close to your body',
+  'Elbow Angle':'control the elbow bend through the rep',
+  'Elbow Width':'keep a consistent elbow width',
+  'Head/Neck':'keep your head neutral with your spine',
+  'Hip Extension':'squeeze to full hip extension at the top',
+  'Knee Angle':'set your feet for about a 90° knee angle',
+  'Athletic Stance':'load into a lower athletic stance',
+  'Balance':'stay balanced over your base',
+  'Hip-Shoulder Coil':'create more hip-shoulder separation',
+  'Head Position':'keep your head still with your eyes on target',
+  'Elbow Alignment':'tuck your shooting elbow under the ball',
+  'Shooting Arm':'extend fully and snap your wrist',
+  'Leg Drive':'drive up through your legs',
+  'Arm Slot':'keep your throwing elbow up at shoulder height',
+  'Stride / Base':'step into it with a wider base',
+  'Plant Leg':'plant a firmer support leg',
+  'Kicking Leg':'snap your lower leg through the ball',
+  'Body Balance':'open your arms out for balance',
+  'Hip Drive':'drive your hips through the motion',
+  'Shoulder Turn':'turn your shoulders further to build coil',
+  'Swing Extension':'extend your arm fully through the contact point',
+  'Posture':'hinge from your hips and hold your spine angle',
+  'Knee Flex':'soften your knees into an athletic flex',
+};
+
+function wellBullet(m){
+  if (m.isHold) return `<b>${m.name}</b> — held solid form (avg ${m.avg}) for up to ${Math.floor(m.bestHold)}s.`;
+  let s = `<b>${m.name}</b> — strong, consistent form (avg ${m.avg})`;
+  if (m.bestCrit) s += `; your ${m.bestCrit.name.toLowerCase()} really stood out`;
+  return s + '.';
+}
+
+function improveBullet(m){
+  const w = m.worstCrit;
+  const cue = w ? (CRIT_CUES[w.name] || `tighten up your ${w.name.toLowerCase()}`) : 'aim for cleaner, fuller reps';
+  const tail = w ? ` (${w.name} ${w.avg})` : '';
+  if (m.isHold) return `<b>${m.name}</b> — hold form averaged ${m.avg}; ${cue}${tail}.`;
+  return `<b>${m.name}</b> (avg ${m.avg}) — ${cue}${tail}.`;
+}
+
+function renderReport(){
+  const d = buildReportData();
+  const overlay = document.getElementById('reportOverlay');
+
+  if (!d.hasData){
+    overlay.innerHTML = `<div class="report-inner">
+      <div class="report-top">
+        <div><div class="report-title">Workout <span>Summary</span></div>
+        <div class="report-sub">No reps recorded yet</div></div>
+        <button class="report-close" id="btnCloseReport">✕ Close</button>
+      </div>
+      <div class="report-card"><div class="rc-empty">Perform a few reps of any movement while fully in frame, then stop your workout to see a full analysis here.</div></div>
+      <div class="report-actions"><button class="btn btn-primary" id="btnResume">Resume</button></div>
+    </div>`;
+    wireReportButtons();
+    return;
+  }
+
+  const col = scoreColor(d.overall);
+  const C = 2 * Math.PI * 66;
+
+  const chips = [
+    `<div class="chip"><div class="cv" style="color:${col}">${d.overall}</div><div class="cl">Avg Score</div></div>`,
+    `<div class="chip"><div class="cv">${d.movements.length}</div><div class="cl">Movements</div></div>`,
+    `<div class="chip"><div class="cv">${d.totalReps}</div><div class="cl">Total Reps</div></div>`,
+  ];
+  if (d.totalHold > 0) chips.push(`<div class="chip"><div class="cv">${Math.floor(d.totalHold)}s</div><div class="cl">Hold Time</div></div>`);
+  chips.push(`<div class="chip"><div class="cv">${fmtDur(performance.now() - sessionStart)}</div><div class="cl">Session</div></div>`);
+
+  const mvRows = d.movements.map(m => `
+    <div class="mv-row">
+      <span class="mv-ic">${m.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div class="mv-name">${m.name}</div>
+        <div class="mv-detail">${m.isHold
+          ? `Best hold ${Math.floor(m.bestHold)}s`
+          : `${m.reps} ${m.label.toLowerCase()} · best ${m.best || '—'}`}${m.varNames.length ? ` · ${m.varNames.join(', ')}` : ''}</div>
+      </div>
+      <div class="mv-score" style="color:${scoreColor(m.avg)}">${m.avg}</div>
+    </div>`).join('');
+
+  overlay.innerHTML = `<div class="report-inner">
+    <div class="report-top">
+      <div>
+        <div class="report-title">Workout <span>Summary</span></div>
+        <div class="report-sub">Here's how your form held up this session.</div>
+      </div>
+      <button class="report-close" id="btnCloseReport">✕ Close</button>
+    </div>
+
+    <div class="report-hero">
+      <div class="hero-score">
+        <svg width="150" height="150" viewBox="0 0 150 150" style="transform:rotate(-90deg)">
+          <circle cx="75" cy="75" r="66" fill="none" stroke="var(--border)" stroke-width="10"/>
+          <circle cx="75" cy="75" r="66" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - d.overall/100)}"/>
+        </svg>
+        <div class="hs-num" style="color:${col}">${d.overall}</div>
+      </div>
+      <div class="hero-meta">
+        <div class="hero-grade" style="color:${col}">${scoreGrade(d.overall)}</div>
+        <div class="hero-line">Overall form score across your whole session.</div>
+        <div class="chips">${chips.join('')}</div>
+      </div>
+    </div>
+
+    <div class="report-cols">
+      <div class="report-card">
+        <h3>✅ What you did well</h3>
+        ${d.wellMovements.length
+          ? `<ul class="bullets">${d.wellMovements.map(m => `<li class="bullet good"><span class="bi">✓</span><span>${wellBullet(m)}</span></li>`).join('')}</ul>`
+          : '<div class="rc-empty">Keep training — movements will land here once your form averages 78+.</div>'}
+      </div>
+      <div class="report-card">
+        <h3>🎯 What to focus on</h3>
+        ${d.improveMovements.length
+          ? `<ul class="bullets">${d.improveMovements.map(m => `<li class="bullet bad"><span class="bi">!</span><span>${improveBullet(m)}</span></li>`).join('')}</ul>`
+          : '<div class="rc-empty">No major issues — every movement looked solid. Nice work!</div>'}
+      </div>
+    </div>
+
+    <div class="report-card">
+      <h3>📋 Per-movement breakdown</h3>
+      ${mvRows}
+    </div>
+
+    <div class="report-actions">
+      <button class="btn btn-ghost" id="btnNew">Start New Session</button>
+      <button class="btn btn-primary" id="btnResume">Resume Session</button>
+    </div>
+  </div>`;
+  wireReportButtons();
+}
+
+function wireReportButtons(){
+  const c = document.getElementById('btnCloseReport'); if (c) c.addEventListener('click', closeReport);
+  const r = document.getElementById('btnResume');      if (r) r.addEventListener('click', closeReport);
+  const n = document.getElementById('btnNew');         if (n) n.addEventListener('click', newSession);
+}
+
+function openReport(){
+  reportOpen = true; lastTick = 0;
+  renderReport();
+  document.getElementById('reportOverlay').hidden = false;
+  window.scrollTo(0, 0);
+}
+function closeReport(){
+  reportOpen = false;
+  document.getElementById('reportOverlay').hidden = true;
+}
+function newSession(){
+  Object.keys(sessionStats).forEach(k => delete sessionStats[k]);
+  resetRepState();
+  sessionStart = performance.now();
+  closeReport();
+  renderStats();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM GUIDE — proper vs improper form, with example videos
+// ─────────────────────────────────────────────────────────────────────────────
+const FORM_GUIDE = {
+  squat:    { good:['Hips sink to or below knee level','Knees track out over the toes','Chest up with a neutral spine','Weight through mid-foot and heels'], bad:['Knees caving inward','Heels lifting off the floor','Rounding the lower back','Cutting the depth short'] },
+  lunge:    { good:['Front knee about 90°, over the ankle','Torso tall and upright','Back knee lowers toward the floor','Slow, balanced descent'], bad:['Front knee driving past the toes','Leaning the torso forward','Short, shallow steps','Wobbling or losing balance'] },
+  pushup:   { good:['Straight line from head to heels','Elbows about 45° from the body','Lower chest to ~fist height','Full lockout at the top'], bad:['Hips sagging or piking up','Elbows flaring out to 90°','Half range of motion','Head dropping forward'] },
+  deadlift: { good:['Neutral, flat back','Hinge at the hips','Bar stays close to the body','Full hip lockout at the top'], bad:['Rounding the lower back','Hips shooting up first','Bar drifting away from you','Hyperextending at the top'] },
+  ohp:      { good:['Braced core, ribs down','Press in a straight line','Wrists stacked over elbows','Full overhead lockout'], bad:['Excessive lower-back arch','Pressing the bar out front','Flared, bent-back wrists','Stopping short of lockout'] },
+  curl:     { good:['Elbows pinned to your sides','Full range up and down','Controlled lowering (no dropping)','Still, upright torso'], bad:['Swinging with the back','Elbows drifting forward','Half reps','Using momentum to heave'] },
+  row:      { good:['Hinge ~45° with a flat back','Pull elbows past your torso','Squeeze the shoulder blades','Elbows close to the body'], bad:['Standing too upright','Yanking with momentum','Rounding the back','Shrugging the shoulders'] },
+  bench:    { good:['Elbows ~45–75° from the torso','Bar to mid-chest','Even, symmetric press','Wrists stacked over elbows'], bad:['Elbows flared to 90°','Bouncing the bar off the chest','Pressing unevenly','Half range of motion'] },
+  plank:    { good:['Straight line from head to heels','Elbows under the shoulders','Glutes and core braced','Neutral neck'], bad:['Hips sagging down','Hips piking up','Head dropping','Holding your breath'] },
+  glute:    { good:['Full hip extension at the top','Shins vertical at the top','Ribs down, slight posterior tilt','Drive through the heels'], bad:['Arching the lower back','Pushing through the toes','Incomplete lockout','Knees caving inward'] },
+  tricep:    { good:['Elbows pinned to your sides','Extend fully and squeeze the triceps','Tall, still torso','Control the weight back up'], bad:['Elbows flaring out or forward','Half range — not locking out','Leaning / using bodyweight','Letting it snap back up'] },
+  bulgarian: { good:['Most weight on the front foot','Front knee tracks over the toes','Torso tall, slight forward lean','Front thigh to about parallel'], bad:['Pushing off the back foot','Front knee caving inward','Folding the torso forward','Too shallow a rep'] },
+  seatedrow: { good:['Tall chest, neutral spine','Drive elbows back to the torso','Squeeze the shoulder blades','Full stretch each rep'], bad:['Rounding the back','Heaving with the torso','Short, partial pulls','Shrugging the shoulders'] },
+  pullup:    { good:['Start from a full dead hang','Pull your chin over the bar','Drive elbows down and back','Lower under control'], bad:['Partial range of motion','Kipping / swinging','Shrugging instead of pulling','Not fully extending at the bottom'] },
+  situp:     { good:['Knees bent, feet planted','Curl up rounding the spine','Chin lightly tucked','Lower with control'], bad:['Yanking on the neck','Jerky, straight-back lift','Feet flying up','Dropping back down'] },
+};
+
+// ── Animated mannequin demos (rendered in-browser, no external video) ──
+// A side-view jointed figure posed by forward-kinematics from a few angles.
+// Each movement defines a proper sequence and an improper one whose fault is
+// flagged in red. Angles: torso/head from vertical-up (+ = lean forward);
+// arms/legs from straight-down (+ = swing forward). Coords are 0–100, y-up.
+const ST = { hipX:50, hipY:44, torso:8, head:4, ua:12, fa:16, thigh:3, shin:-3 };
+const P  = o => Object.assign({}, ST, o);
+
+const MANNEQUIN = {
+  squat:{ speed:2.6, fault:{joint:'knee', label:'Knees drive past the toes'},
+    good:[P({ua:32,fa:150}), P({hipY:22, torso:38, thigh:72, shin:-50, ua:32, fa:150})],
+    bad :[P({ua:32,fa:150}), P({hipY:24, torso:12, thigh:88, shin:-28, ua:32, fa:150})] },
+  lunge:{ speed:2.9, fault:{joint:'knee', label:'Front knee past the toe'},
+    good:[P({ua:6,fa:8, thighL:3,  shinL:-3,  thighR:3,  shinR:-3}),
+          P({ua:6,fa:8, hipY:43,   thighL:3,  shinL:-3,  thighR:45, shinR:60}),
+          P({ua:6,fa:8, torso:12, hipY:28, thighR:74, shinR:-14, thighL:-10, shinL:-90})],
+    bad :[P({ua:6,fa:8, thighL:3,  shinL:-3,  thighR:3,  shinR:-3}),
+          P({ua:6,fa:8, hipY:43,   thighL:3,  shinL:-3,  thighR:45, shinR:60}),
+          P({ua:6,fa:8, torso:20, hipY:28, thighR:92, shinR:24, thighL:-10, shinL:-90})] },
+  pushup:{ speed:2.2, fault:{joint:'hip', label:'Hips sagging'},
+    good:[P({hipY:40, torso:90, head:84, ua:2, fa:3, thigh:-90, shin:-90}),
+          P({hipY:34, torso:90, head:84, ua:10, fa:55, thigh:-90, shin:-90})],
+    bad :[P({hipY:40, torso:80, head:74, ua:2, fa:3, thigh:-80, shin:-86}),
+          P({hipY:34, torso:80, head:74, ua:10, fa:55, thigh:-80, shin:-86})] },
+  deadlift:{ speed:2.6, fault:{joint:'shoulder', label:'Rounding the back'},
+    good:[ST, P({hipY:38, torso:55, head:50, thigh:12, shin:-14, ua:4, fa:4})],
+    bad :[ST, P({hipY:38, torso:58, head:30, thigh:12, shin:-14, ua:4, fa:4})] },
+  ohp:{ speed:2.4, fault:{joint:'hip', label:'Arching the lower back'},
+    good:[P({ua:25, fa:170}), P({ua:180, fa:180})],
+    bad :[P({ua:25, fa:170, torso:-14}), P({ua:180, fa:180, torso:-22, head:-12})] },
+  curl:{ speed:2.3, fault:{joint:'elbow', label:'Swinging & elbow drift'},
+    good:[P({ua:6,fa:8}), P({ua:8,fa:125})],
+    bad :[P({ua:6,fa:8,torso:10}), P({ua:34,fa:125,torso:-10})] },
+  row:{ speed:2.4, fault:{joint:'shoulder', label:'Rounding the back'},
+    good:[P({torso:72, head:66, hipY:42, thigh:10, shin:-16, ua:0,    fa:0}),
+          P({torso:72, head:66, hipY:42, thigh:10, shin:-16, ua:-100, fa:42})],
+    bad :[P({torso:60, head:95, hipY:42, thigh:10, shin:-16, ua:0,   fa:0}),
+          P({torso:48, head:88, hipY:42, thigh:10, shin:-16, ua:-66, fa:18})] },
+  bench:{ speed:2.2, fault:{joint:'elbow', label:'Half range of motion'},
+    good:[P({hipY:40, torso:270, head:270, thigh:64, shin:14, ua:95,  fa:255}),
+          P({hipY:40, torso:270, head:270, thigh:64, shin:14, ua:125, fa:215}),
+          P({hipY:40, torso:270, head:270, thigh:64, shin:14, ua:180, fa:180})],
+    bad :[P({hipY:40, torso:270, head:270, thigh:64, shin:14, ua:125, fa:215}),
+          P({hipY:40, torso:270, head:270, thigh:64, shin:14, ua:180, fa:180})] },
+  plank:{ speed:3.0, fault:{joint:'hip', label:'Hips sagging'},
+    good:[P({hipX:47,hipY:35,torso:79,head:87,ua:1,fa:86,thigh:-85,shin:-92})],
+    bad :[P({hipX:47,hipY:29,torso:71,head:80,ua:1,fa:86,thigh:-78,shin:-86})] },
+  glute:{ speed:2.6, fault:{joint:'hip', label:'Incomplete hip extension'},
+    good:[P({hipY:15, torso:258, head:258, thigh:142, shin:16, ua:110, fa:110}),
+          P({hipY:23, torso:234, head:234, thigh:114, shin:8,  ua:130, fa:130})],
+    bad :[P({hipY:15, torso:258, head:258, thigh:142, shin:16, ua:110, fa:110}),
+          P({hipY:19, torso:245, head:245, thigh:128, shin:12, ua:122, fa:122})] },
+  tricep:{ speed:2.0, fault:{joint:'elbow', label:'Elbows flaring / leaning'},
+    good:[P({ua:8,  fa:85}), P({ua:8,  fa:5})],
+    bad :[P({ua:35, fa:85, torso:14}), P({ua:35, fa:22, torso:20})] },
+  bulgarian:{ speed:2.7, fault:{joint:'knee', label:'Front knee past the toes'},
+    good:[P({hipY:40, torso:6,  ua:6,fa:8, thighR:30, shinR:-20, thighL:-40, shinL:-120}),
+          P({hipY:30, torso:14, ua:6,fa:8, thighR:72, shinR:-10, thighL:-40, shinL:-120})],
+    bad :[P({hipY:40, torso:8,  ua:6,fa:8, thighR:30, shinR:-20, thighL:-40, shinL:-120}),
+          P({hipY:30, torso:22, ua:6,fa:8, thighR:92, shinR:20,  thighL:-40, shinL:-120})] },
+  seatedrow:{ speed:2.4, fault:{joint:'shoulder', label:'Rounding / heaving the torso'},
+    good:[P({hipY:30, torso:6,  thigh:75, shin:-30, ua:55,  fa:65}),
+          P({hipY:30, torso:8,  thigh:75, shin:-30, ua:-40, fa:40})],
+    bad :[P({hipY:30, torso:28, head:62, thigh:75, shin:-30, ua:55,  fa:65}),
+          P({hipY:30, torso:-18, thigh:75, shin:-30, ua:-40, fa:40})] },
+  pullup:{ speed:2.6, fault:{joint:'elbow', label:'Partial range / kipping'},
+    good:[P({hipY:46, torso:2,  thigh:4,  shin:-4,  ua:180, fa:180}),
+          P({hipY:68, torso:-8, thigh:18, shin:-24, ua:95,  fa:250})],
+    bad :[P({hipY:46, torso:2,  thigh:4,  shin:-4,  ua:180, fa:180}),
+          P({hipY:51, torso:12, thigh:34, shin:-46, ua:150, fa:205})] },
+  situp:{ speed:2.6, fault:{joint:'head', label:'Pulling on the neck'},
+    good:[P({hipY:12, torso:-90, head:-90, thigh:125, shin:40, ua:80, fa:85}),
+          P({hipY:12, torso:-30, head:8,   thigh:125, shin:40, ua:68, fa:84})],
+    bad :[P({hipY:12, torso:-90, head:-90, thigh:125, shin:40, ua:80, fa:85}),
+          P({hipY:12, torso:-30, head:60,  thigh:125, shin:40, ua:68, fa:84})] },
+};
+
+let mannStops = [];
+
+// Equipment per movement, drawn onto the figure
+const EQUIP = {
+  squat:'barback', deadlift:'barhands', ohp:'barhands', row:'barhands', bench:'barbench',
+  curl:'dumbbell', lunge:'dumbbell', glute:'barhips', pushup:null, plank:null,
+  tricep:'barhands', bulgarian:'rearbench', seatedrow:'cablerow', pullup:'barhands', situp:null,
+};
+
+function drawEquip2D(ctx, Q, type){
+  if (!type) return;
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const metal = '#c2c6d4', plate = light ? '#33384e' : '#1c1f30';
+  const bar = (cx, cy, len) => {
+    ctx.strokeStyle = metal; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx-len/2, cy); ctx.lineTo(cx+len/2, cy); ctx.stroke();
+    ctx.fillStyle = plate;
+    [cx-len/2, cx+len/2].forEach(x => { ctx.beginPath(); ctx.ellipse(x, cy, 5, 11, 0, 0, 7); ctx.fill(); });
+  };
+  if (type === 'barhands') bar(Q.wrist.x, Q.wrist.y, 46);
+  else if (type === 'barback') bar(Q.shoulder.x, Q.shoulder.y, 46);
+  else if (type === 'barhips') bar(Q.hip.x, Q.hip.y, 42);
+  else if (type === 'dumbbell'){
+    const x = Q.wrist.x, y = Q.wrist.y;
+    ctx.fillStyle = plate; ctx.fillRect(x-2.5, y-9, 5, 18);
+    ctx.beginPath(); ctx.ellipse(x, y-9, 7, 5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y+9, 7, 5, 0, 0, 7); ctx.fill();
+  } else if (type === 'barbench'){
+    const bx = (Q.shoulder.x + Q.hip.x)/2, by = Math.max(Q.shoulder.y, Q.hip.y) + 16, w = Math.abs(Q.shoulder.x - Q.hip.x) + 56;
+    ctx.fillStyle = plate; ctx.fillRect(bx - w/2, by, w, 8); ctx.fillRect(bx - 5, by + 8, 10, 14);
+    bar(Q.wrist.x, Q.wrist.y, 46);
+  }
+}
+
+function fkJoints(p){
+  const r = Math.PI/180;
+  const hip = {x:p.hipX, y:p.hipY};
+  const sh  = {x:hip.x + 22*Math.sin(p.torso*r), y:hip.y + 22*Math.cos(p.torso*r)};
+  const hd  = {x:sh.x  + 10*Math.sin(p.head*r),  y:sh.y  + 10*Math.cos(p.head*r)};
+  const el  = {x:sh.x  + 13*Math.sin(p.ua*r),    y:sh.y  - 13*Math.cos(p.ua*r)};
+  const wr  = {x:el.x  + 12*Math.sin(p.fa*r),    y:el.y  - 12*Math.cos(p.fa*r)};
+  const kn  = {x:hip.x + 18*Math.sin(p.thigh*r), y:hip.y - 18*Math.cos(p.thigh*r)};
+  const an  = {x:kn.x  + 18*Math.sin(p.shin*r),  y:kn.y  - 18*Math.cos(p.shin*r)};
+  return {head:hd, shoulder:sh, elbow:el, wrist:wr, hip, knee:kn, ankle:an};
+}
+
+function lerpPose(a, b, e){ const o={}; for(const k in a) o[k] = a[k] + (((b[k]??a[k]) - a[k]) * e); return o; }
+
+// Natural rep tempo: brief hold at the top, controlled (slower) descent, short
+// pause at the bottom, slightly quicker drive up, then rest — instead of a flat
+// symmetric loop. Returns 0 (start pose) → 1 (end pose) → 0 across one cycle.
+function smoother(t){ t = Math.max(0, Math.min(1, t)); return t*t*t*(t*(t*6-15)+10); }
+function repEase(ph){
+  const topHold = 0.12, descend = 0.34, botHold = 0.10, ascend = 0.28;  // rest = remainder
+  if (ph < topHold) return 0;
+  ph -= topHold;
+  if (ph < descend) return smoother(ph/descend);
+  ph -= descend;
+  if (ph < botHold) return 1;
+  ph -= botHold;
+  if (ph < ascend) return 1 - smoother(ph/ascend);
+  return 0;
+}
+// Subtle life: gentle breathing sway, plus a small bob during static holds.
+function liven(pose, ts, hold){
+  const o = Object.assign({}, pose);
+  const br = Math.sin(ts * 0.0022);
+  o.torso = (o.torso ?? 0) + br * 0.6;
+  o.head  = (o.head  ?? 0) + br * 0.4;
+  if (hold) o.hipY = (o.hipY ?? 44) + Math.sin(ts * 0.0016) * 0.5;
+  return o;
+}
+
+function drawMannequin(ctx, W, H, pose, fault, isGood){
+  ctx.clearRect(0,0,W,H);
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const fig = light ? '#454a66' : '#d6d9f0', jc = light ? '#262a3c' : '#ffffff', gnd = light ? '#cdd1e0' : '#2c2f48';
+  const J = fkJoints(pose);
+  const sc = (H - 60) / 86;
+  const px = p => ({ x: W/2 + (p.x - 50)*sc, y: (H - 26) - p.y*sc });
+  const Q = {}; for (const k in J) Q[k] = px(J[k]);
+
+  ctx.strokeStyle = gnd; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(16, H-22); ctx.lineTo(W-16, H-22); ctx.stroke();
+
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const seg = (a,b,w,c) => { ctx.strokeStyle=c; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); };
+  seg(Q.hip, Q.shoulder, 14, fig);
+  seg(Q.shoulder, Q.head, 6, fig);
+  seg(Q.hip, Q.knee, 12, fig); seg(Q.knee, Q.ankle, 11, fig);
+  seg(Q.shoulder, Q.elbow, 10, fig); seg(Q.elbow, Q.wrist, 9, fig);
+  ctx.fillStyle = fig; ctx.beginPath(); ctx.arc(Q.head.x, Q.head.y, 9, 0, 7); ctx.fill();
+  ctx.fillStyle = jc;
+  [Q.shoulder,Q.elbow,Q.wrist,Q.hip,Q.knee,Q.ankle].forEach(p => { ctx.beginPath(); ctx.arc(p.x,p.y,3,0,7); ctx.fill(); });
+
+  drawEquip2D(ctx, Q, EQUIP[curExercise]);
+
+  if (isGood){
+    ctx.fillStyle = '#00c46a'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('✓ Correct form', W/2, 20);
+  } else if (fault){
+    const fp = Q[fault.joint] || Q.hip;
+    ctx.strokeStyle = '#ff4455'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(fp.x, fp.y, 13, 0, 7); ctx.stroke();
+    ctx.setLineDash([4,3]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W/2, 30); ctx.lineTo(fp.x, fp.y - 15); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ff4455'; ctx.font = 'bold 12.5px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('✗ ' + fault.label, W/2, 20);
+  }
+}
+
+function startMannequin(canvas, frames, fault, speed, isGood){
+  if (!canvas || !frames || !frames.length) return null;
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  let raf = 0, t0 = null, stopped = false;
+  const per = (speed || 2.5) * 1000;
+  function loop(ts){
+    if (stopped) return;
+    if (t0 === null) t0 = ts;
+    let pose;
+    if (frames.length === 1) pose = frames[0];
+    else { const ph = ((ts - t0) % per) / per; const e = 0.5 - 0.5*Math.cos(ph * 2 * Math.PI); pose = lerpPose(frames[0], frames[1], e); }
+    drawMannequin(ctx, W, H, pose, fault, isGood);
+    raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+  return () => { stopped = true; cancelAnimationFrame(raf); };
+}
+
+function stopMannequins(){ mannStops.forEach(s => s && s()); mannStops = []; }
+
+// ── Interactive 3D mannequin: full skeleton with depth, drag to rotate ──
+function buildPose3D(p){
+  const r = Math.PI/180;
+  const hw = 7, sw = 10, Lt = 22, Lh = 12, Lua = 13, Lfa = 12, Lth = 18, Lsh = 18;
+  const pelvis = {x:0, y:p.hipY, z:0};
+  const lean = (p.torso||0)*r;
+  const chest = {x:pelvis.x + Lt*Math.sin(lean), y:pelvis.y + Lt*Math.cos(lean), z:0};
+  const tw = (p.tw||0)*r;
+  const f   = {x:Math.cos(tw), y:0, z:-Math.sin(tw)};
+  const lat = {x:Math.sin(tw), y:0, z:Math.cos(tw)};
+  const shL = {x:chest.x + sw*lat.x, y:chest.y, z:chest.z + sw*lat.z};
+  const shR = {x:chest.x - sw*lat.x, y:chest.y, z:chest.z - sw*lat.z};
+  const head= {x:chest.x + Lh*Math.sin((p.head||0)*r), y:chest.y + Lh*Math.cos((p.head||0)*r), z:chest.z};
+  const arm = (sh, ua, fa) => {
+    const ed = {x:f.x*Math.sin(ua*r), y:-Math.cos(ua*r), z:f.z*Math.sin(ua*r)};
+    const el = {x:sh.x + Lua*ed.x, y:sh.y + Lua*ed.y, z:sh.z + Lua*ed.z};
+    const fd = {x:f.x*Math.sin(fa*r), y:-Math.cos(fa*r), z:f.z*Math.sin(fa*r)};
+    const wr = {x:el.x + Lfa*fd.x, y:el.y + Lfa*fd.y, z:el.z + Lfa*fd.z};
+    return {el, wr};
+  };
+  const aL = arm(shL, p.uaL ?? p.ua, p.faL ?? p.fa), aR = arm(shR, p.uaR ?? p.ua, p.faR ?? p.fa);
+  const hipL = {x:0, y:p.hipY, z:+hw}, hipR = {x:0, y:p.hipY, z:-hw};
+  const leg = (hip, th, sh2) => {
+    const kn = {x:hip.x + Lth*Math.sin(th*r), y:hip.y - Lth*Math.cos(th*r), z:hip.z};
+    const an = {x:kn.x + Lsh*Math.sin(sh2*r), y:kn.y - Lsh*Math.cos(sh2*r), z:kn.z};
+    return {kn, an};
+  };
+  const lL = leg(hipL, p.thighL ?? p.thigh, p.shinL ?? p.shin), lR = leg(hipR, p.thighR ?? p.thigh, p.shinR ?? p.shin);
+  return {pelvis, chest, head, shL, shR, elL:aL.el, wrL:aL.wr, elR:aR.el, wrR:aR.wr,
+          hipL, hipR, knL:lL.kn, anL:lL.an, knR:lR.kn, anR:lR.an};
+}
+
+const BONES3 = [
+  ['hipL','hipR',10],['pelvis','chest',14],['chest','shL',6],['chest','shR',6],['chest','head',6],
+  ['shL','elL',9],['elL','wrL',8],['shR','elR',9],['elR','wrR',8],
+  ['hipL','knL',11],['knL','anL',10],['hipR','knR',11],['knR','anR',10],
+];
+
+function drawGymEquip3D(ctx, proj, J, type, base){
+  if (!type) return;
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const metal = '#c2c6d4', plate = light ? '#33384e' : '#1c1f30';
+  const barbell = (jA, jB, half) => {
+    const d = {x:jB.x-jA.x, y:jB.y-jA.y, z:jB.z-jA.z};
+    const L = Math.hypot(d.x,d.y,d.z) || 1, u = {x:d.x/L, y:d.y/L, z:d.z/L};
+    const m = {x:(jA.x+jB.x)/2, y:(jA.y+jB.y)/2, z:(jA.z+jB.z)/2};
+    const e1 = {x:m.x-u.x*half, y:m.y-u.y*half, z:m.z-u.z*half};
+    const e2 = {x:m.x+u.x*half, y:m.y+u.y*half, z:m.z+u.z*half};
+    const P1 = proj(e1), P2 = proj(e2);
+    ctx.strokeStyle = metal; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(2, 4*(((P1.persp+P2.persp)/2)/base));
+    ctx.beginPath(); ctx.moveTo(P1.x,P1.y); ctx.lineTo(P2.x,P2.y); ctx.stroke();
+    ctx.fillStyle = plate;
+    [P1,P2].forEach(P => { ctx.beginPath(); ctx.arc(P.x, P.y, Math.max(3, 6*(P.persp/base)), 0, 7); ctx.fill(); });
+  };
+  if (type === 'barhands') barbell(J.wrL, J.wrR, 14);
+  else if (type === 'barback') barbell(J.shL, J.shR, 14);
+  else if (type === 'barhips') barbell(J.hipL, J.hipR, 16);
+  else if (type === 'dumbbell'){
+    [J.wrL, J.wrR].forEach(w => { const P = proj(w); ctx.fillStyle = plate; ctx.beginPath(); ctx.arc(P.x, P.y, Math.max(3, 5*(P.persp/base)), 0, 7); ctx.fill(); });
+  } else if (type === 'barbench'){
+    const sM = {x:(J.shL.x+J.shR.x)/2, y:(J.shL.y+J.shR.y)/2, z:0};
+    const hM = {x:(J.hipL.x+J.hipR.x)/2, y:(J.hipL.y+J.hipR.y)/2, z:0};
+    const yb = Math.min(sM.y, hM.y) - 6, wz = 11;
+    const c = [{x:hM.x-3,y:yb,z:wz},{x:sM.x+8,y:yb,z:wz},{x:sM.x+8,y:yb,z:-wz},{x:hM.x-3,y:yb,z:-wz}].map(proj);
+    ctx.fillStyle = light ? '#b9bed6' : '#20233a';
+    ctx.beginPath(); ctx.moveTo(c[0].x,c[0].y); for (let i=1;i<4;i++) ctx.lineTo(c[i].x,c[i].y); ctx.closePath(); ctx.fill();
+    barbell(J.wrL, J.wrR, 14);
+  } else if (type === 'rearbench'){
+    const a = J.anL, wz = 6, wx = 7, yb = a.y - 3;        // small bench under the raised rear foot
+    const c = [{x:a.x-wx,y:yb,z:a.z+wz},{x:a.x+wx,y:yb,z:a.z+wz},{x:a.x+wx,y:yb,z:a.z-wz},{x:a.x-wx,y:yb,z:a.z-wz}].map(proj);
+    ctx.fillStyle = light ? '#b9bed6' : '#20233a';
+    ctx.beginPath(); ctx.moveTo(c[0].x,c[0].y); for (let i=1;i<4;i++) ctx.lineTo(c[i].x,c[i].y); ctx.closePath(); ctx.fill();
+  } else if (type === 'cablerow'){
+    const quad = (pts, col) => { const c = pts.map(proj); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(c[0].x,c[0].y); for (let i=1;i<4;i++) ctx.lineTo(c[i].x,c[i].y); ctx.closePath(); ctx.fill(); };
+    const hM = {x:(J.hipL.x+J.hipR.x)/2, y:(J.hipL.y+J.hipR.y)/2}, fM = {x:(J.anL.x+J.anR.x)/2, y:(J.anL.y+J.anR.y)/2};
+    const yb = hM.y - 6;                                   // seat slab under the hips (extends back)
+    quad([{x:hM.x-16,y:yb,z:9},{x:hM.x+5,y:yb,z:9},{x:hM.x+5,y:yb,z:-9},{x:hM.x-16,y:yb,z:-9}], light ? '#aab0c8' : '#23273e');
+    const px2 = fM.x + 5;                                  // foot plate in front of the feet
+    quad([{x:px2,y:fM.y-4,z:9},{x:px2,y:fM.y+11,z:9},{x:px2,y:fM.y+11,z:-9},{x:px2,y:fM.y-4,z:-9}], light ? '#9aa1bd' : '#2c3150');
+    const grip = {x:(J.wrL.x+J.wrR.x)/2, y:(J.wrL.y+J.wrR.y)/2, z:(J.wrL.z+J.wrR.z)/2};   // cable to the handle
+    const G = proj(grip), Pu = proj({x:px2, y:fM.y+3, z:0});
+    ctx.strokeStyle = light ? '#666' : '#9aa0b5'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(Pu.x, Pu.y); ctx.lineTo(G.x, G.y); ctx.stroke();
+    barbell(J.wrL, J.wrR, 7);
+  }
+}
+
+function renderFrame3D(ctx, W, H, pose, fault, isGood, az, el, hint){
+  ctx.clearRect(0,0,W,H);
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const col = light ? [69,74,102] : [214,217,240];
+  const J = buildPose3D(pose);
+  const fcl = 240, D = 185, base = fcl/D, scale = 2.2, cx = W/2, cy = H*0.5;
+  let pvx = 0, pvy = 0, nP = 0;                        // orbit + centre on the pose's centroid
+  for (const k in J){ pvx += J[k].x; pvy += J[k].y; nP++; }
+  pvx /= nP; pvy /= nP;
+  const ca = Math.cos(az), sa = Math.sin(az), ce = Math.cos(el), se = Math.sin(el);
+  const proj0 = p => {
+    const x = p.x - pvx, y = p.y - pvy, z = p.z;
+    const x1 = x*ca + z*sa, z1 = -x*sa + z*ca, y1 = y;
+    const y2 = y1*ce - z1*se, z2 = y1*se + z1*ce;
+    const persp = fcl/(D - z2);
+    return {x:cx + x1*persp*scale, y:cy - y2*persp*scale, depth:z2, persp};
+  };
+  // Pin a fixed floor (world y≈8) to a constant ground line so the figure stays
+  // planted on one floor instead of appearing to step onto moving platforms.
+  const groundY = H - 26;
+  const gdy = groundY - proj0({x:0, y:8, z:0}).y;
+  const proj = p => { const P = proj0(p); P.y += gdy; return P; };
+  const Q = {}; let dmin = 1e9, dmax = -1e9;
+  for (const k in J){ const P = proj(J[k]); Q[k] = P; if (P.depth < dmin) dmin = P.depth; if (P.depth > dmax) dmax = P.depth; }
+  // soft contact shadow on the ground
+  ctx.fillStyle = light ? 'rgba(20,24,42,.15)' : 'rgba(0,0,0,.26)';
+  ctx.beginPath(); ctx.ellipse(cx, groundY + 4, 42, 7, 0, 0, 7); ctx.fill();
+  // Rounded human body: muscle-bellied limbs, a curved torso, head, hands, feet,
+  // all shaded with soft radial gradients (light from upper-left) for 3D volume.
+  const baseRGB = light ? [122,130,156] : [196,202,228];
+  const lit = d => { const t = dmax > dmin ? (d-dmin)/(dmax-dmin) : 0.5; return 0.6 + 0.4*t; };  // near = brighter
+  const mix = m => `rgb(${Math.min(255,baseRGB[0]*m)|0},${Math.min(255,baseRGB[1]*m)|0},${Math.min(255,baseRGB[2]*m)|0})`;
+  const edge = d => mix(lit(d) * 0.5);
+  const LX = -0.45, LY = -0.82;                       // screen-space light direction
+  const grad = (x, y, R, d) => {
+    const m = lit(d), r = Math.max(2, R);
+    const g = ctx.createRadialGradient(x + LX*r*0.42, y + LY*r*0.42, r*0.08, x, y, r*1.12);
+    g.addColorStop(0, mix(Math.min(1.25, m*1.32)));
+    g.addColorStop(0.55, mix(m));
+    g.addColorStop(1, mix(m*0.6));
+    return g;
+  };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // tapered segment + end caps into the current path (screen-space radii)
+  const seg = (A,B,rA,rB) => {
+    const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1, px=-dy/L, py=dx/L;
+    ctx.moveTo(A.x+px*rA,A.y+py*rA); ctx.lineTo(B.x+px*rB,B.y+py*rB);
+    ctx.lineTo(B.x-px*rB,B.y-py*rB); ctx.lineTo(A.x-px*rA,A.y-py*rA); ctx.closePath();
+    ctx.moveTo(A.x+rA,A.y); ctx.arc(A.x,A.y,rA,0,7);
+    ctx.moveTo(B.x+rB,B.y); ctx.arc(B.x,B.y,rB,0,7);
+  };
+  // muscle-bellied limb: knot at A, bulge at mid, knot at B
+  const limb = (a,b,rAu,rBu,d) => {
+    const A=Q[a], B=Q[b];
+    const M={x:(A.x+B.x)/2, y:(A.y+B.y)/2, persp:(A.persp+B.persp)/2};
+    const rA=rAu*A.persp*scale, rB=rBu*B.persp*scale, rM=Math.max(rAu,rBu)*1.12*M.persp*scale;
+    const R=Math.hypot(B.x-A.x,B.y-A.y)/2 + rM;
+    const draw=(g,e)=>{ ctx.beginPath(); seg(A,M,rA+e,rM+e); seg(M,B,rM+e,rB+e); ctx.fillStyle=g; ctx.fill(); };
+    draw(edge(d), 0.8); draw(grad(M.x,M.y,R,d), 0);
+  };
+  const ball = (p,ru,d) => {
+    const r=ru*p.persp*scale;
+    ctx.fillStyle=edge(d); ctx.beginPath(); ctx.arc(p.x,p.y,r+1.2,0,7); ctx.fill();
+    ctx.fillStyle=grad(p.x,p.y,r*1.3,d); ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
+  };
+  const foot = (p,d) => {
+    const rx=6*p.persp*scale, ry=3.2*p.persp*scale, oy=ry*0.35;
+    ctx.fillStyle=edge(d); ctx.beginPath(); ctx.ellipse(p.x,p.y+oy,rx+1.2,ry+1.2,0,0,7); ctx.fill();
+    ctx.fillStyle=grad(p.x,p.y+oy,rx*1.2,d); ctx.beginPath(); ctx.ellipse(p.x,p.y+oy,rx,ry,0,0,7); ctx.fill();
+  };
+  const trunk = (d) => {
+    const sL=Q.shL, sR=Q.shR, hL=Q.hipL, hR=Q.hipR;
+    const c={x:(sL.x+sR.x+hL.x+hR.x)/4, y:(sL.y+sR.y+hL.y+hR.y)/4};
+    const inn=(p,t)=>({x:p.x+(c.x-p.x)*t, y:p.y+(c.y-p.y)*t});            // pull toward centre (waist pinch)
+    const wL=inn({x:(sL.x+hL.x)/2,y:(sL.y+hL.y)/2},0.16);
+    const wR=inn({x:(sR.x+hR.x)/2,y:(sR.y+hR.y)/2},0.16);
+    const path=g=>{ ctx.fillStyle=g; ctx.beginPath();
+      ctx.moveTo(sL.x,sL.y); ctx.quadraticCurveTo(wL.x,wL.y,hL.x,hL.y);
+      ctx.lineTo(hR.x,hR.y); ctx.quadraticCurveTo(wR.x,wR.y,sR.x,sR.y); ctx.closePath(); ctx.fill();
+      [[sL,5],[sR,5],[hL,4.6],[hR,4.6]].forEach(([p,ru])=>{ctx.beginPath();ctx.arc(p.x,p.y,ru*p.persp*scale,0,7);ctx.fill();}); };
+    const R=Math.hypot(sR.x-sL.x,sR.y-sL.y)/2 + Math.hypot(sL.x-hL.x,sL.y-hL.y)/2;
+    ctx.strokeStyle=edge(d); ctx.lineWidth=3; path(edge(d)); ctx.stroke();
+    path(grad(c.x,c.y,R,d));
+  };
+  const headPart = (d) => {
+    limb('chest','head',2.9,2.6,d);
+    const h=Q.head, r=6*h.persp*scale;
+    ctx.fillStyle=edge(d); ctx.beginPath(); ctx.ellipse(h.x,h.y,r+1.2,r*1.18+1.2,0,0,7); ctx.fill();
+    ctx.fillStyle=grad(h.x,h.y-r*0.15,r*1.35,d); ctx.beginPath(); ctx.ellipse(h.x,h.y,r,r*1.18,0,0,7); ctx.fill();
+  };
+
+  const avgD = (...ks) => ks.reduce((s,kk)=>s+Q[kk].depth,0)/ks.length;
+  const parts = [
+    {d:avgD('shL','shR','hipL','hipR'), f:dd=>trunk(dd)},
+    {d:avgD('chest','head'),           f:dd=>headPart(dd)},
+    {d:avgD('shL','elL'), f:dd=>limb('shL','elL',4.6,3.6,dd)},
+    {d:avgD('shR','elR'), f:dd=>limb('shR','elR',4.6,3.6,dd)},
+    {d:avgD('elL','wrL'), f:dd=>limb('elL','wrL',3.4,2.7,dd)},
+    {d:avgD('elR','wrR'), f:dd=>limb('elR','wrR',3.4,2.7,dd)},
+    {d:avgD('hipL','knL'), f:dd=>limb('hipL','knL',6,4.6,dd)},
+    {d:avgD('hipR','knR'), f:dd=>limb('hipR','knR',6,4.6,dd)},
+    {d:avgD('knL','anL'), f:dd=>limb('knL','anL',4.4,3.1,dd)},
+    {d:avgD('knR','anR'), f:dd=>limb('knR','anR',4.4,3.1,dd)},
+    {d:Q.wrL.depth, f:dd=>ball(Q.wrL,3.5,dd)},
+    {d:Q.wrR.depth, f:dd=>ball(Q.wrR,3.5,dd)},
+    {d:Q.anL.depth, f:dd=>foot(Q.anL,dd)},
+    {d:Q.anR.depth, f:dd=>foot(Q.anR,dd)},
+  ];
+  parts.sort((m,n)=>m.d-n.d).forEach(p => p.f(p.d));
+
+  drawGymEquip3D(ctx, proj, J, EQUIP[curExercise], base);
+
+  if (isGood){
+    ctx.fillStyle = '#00c46a'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('✓ Correct form', W/2, 20);
+  } else if (fault){
+    const map = {shoulder:'shR', elbow:'elR', hip:'pelvis', knee:'knR', head:'head', ankle:'anR', wrist:'wrR'};
+    const fp = Q[map[fault.joint] || 'pelvis'];
+    ctx.strokeStyle = '#ff4455'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(fp.x, fp.y, 13, 0, 7); ctx.stroke();
+    ctx.setLineDash([4,3]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W/2, 30); ctx.lineTo(fp.x, fp.y - 15); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ff4455'; ctx.font = 'bold 12.5px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('✗ ' + fault.label, W/2, 20);
+  }
+
+  if (hint){
+    ctx.fillStyle = light ? 'rgba(40,44,64,.5)' : 'rgba(255,255,255,.45)';
+    ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText('⟲ drag to rotate', W/2, H - 8);
+  }
+}
+
+function startMannequin3D(canvas, frames, fault, speed, isGood){
+  if (!canvas || !frames || !frames.length) return null;
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  const st = {az:-0.5, el:0.18, drag:false, lx:0, ly:0, touched:false};
+  const down = e => { st.drag = true; st.touched = true; st.lx = e.clientX; st.ly = e.clientY; canvas.style.cursor = 'grabbing'; e.preventDefault(); };
+  const move = e => {
+    if (!st.drag) return;
+    st.az += (e.clientX - st.lx) * 0.012;
+    st.el = Math.max(-1.2, Math.min(1.2, st.el + (e.clientY - st.ly) * 0.012));
+    st.lx = e.clientX; st.ly = e.clientY;
+  };
+  const up = () => { st.drag = false; canvas.style.cursor = 'grab'; };
+  canvas.style.cursor = 'grab'; canvas.style.touchAction = 'none';
+  canvas.addEventListener('pointerdown', down);
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+
+  let raf = 0, t0 = null, stopped = false;
+  const per = (speed || 2.5) * 1000;
+  function loop(ts){
+    if (stopped) return;
+    if (t0 === null) t0 = ts;
+    if (!st.touched) st.az += 0.004;                  // gentle auto-spin until grabbed
+    const hold = frames.length === 1;
+    let pose;
+    if (hold) pose = frames[0];
+    else {
+      const e = repEase(((ts - t0) % per) / per);     // 0 → 1 → 0 across the cycle
+      const seg = e * (frames.length - 1);            // walk along the keyframe path
+      const i = Math.min(frames.length - 2, Math.floor(seg));
+      pose = lerpPose(frames[i], frames[i + 1], seg - i);
+    }
+    pose = liven(pose, ts, hold);
+    renderFrame3D(ctx, W, H, pose, fault, isGood, st.az, st.el, !st.touched);
+    raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+  return () => { stopped = true; cancelAnimationFrame(raf);
+    canvas.removeEventListener('pointerdown', down);
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up); };
+}
+
+function renderGuide(){
+  stopMannequins();
+  const cfg = EXERCISES[curExercise];
+  const g = FORM_GUIDE[curExercise] || {good:[], bad:[]};
+  const m = MANNEQUIN[curExercise];
+  const name = cfg.name;
+  const overlay = document.getElementById('guideOverlay');
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-top">
+      <div class="modal-title">🤖 Form Guide — ${name}</div>
+      <button class="modal-close" id="guideClose">✕</button>
+    </div>
+    <div class="guide-intro">Interactive 3D demos of the <b>${name}</b>: correct technique on the left, the common mistake (flagged in red) on the right. <b>Drag a figure to rotate it</b> and view from any angle.</div>
+    <div class="guide-cols">
+      <div class="guide-card good">
+        <h4>✅ Proper form</h4>
+        <canvas class="mann" id="mannGood" width="300" height="340"></canvas>
+        <ul class="guide-list">${g.good.map(t => `<li><span class="gi good">✓</span><span>${t}</span></li>`).join('')}</ul>
+      </div>
+      <div class="guide-card bad">
+        <h4>❌ Improper form</h4>
+        <canvas class="mann" id="mannBad" width="300" height="340"></canvas>
+        <ul class="guide-list">${g.bad.map(t => `<li><span class="gi bad">✗</span><span>${t}</span></li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="guide-note">Drag a figure to orbit it · stylized 3D demo generated in your browser.</div>
+  </div>`;
+  document.getElementById('guideClose').addEventListener('click', closeGuide);
+  overlay.onclick = e => { if (e.target === overlay) closeGuide(); };   // click backdrop to close
+  if (m){
+    mannStops.push(startMannequin3D(document.getElementById('mannGood'), m.good, null,    m.speed, true));
+    mannStops.push(startMannequin3D(document.getElementById('mannBad'),  m.bad,  m.fault, m.speed, false));
+  }
+}
+function openGuide(){ renderGuide(); document.getElementById('guideOverlay').hidden = false; }
+function closeGuide(){ stopMannequins(); document.getElementById('guideOverlay').hidden = true; }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THEME + ACCESSIBILITY
+// ─────────────────────────────────────────────────────────────────────────────
+function applyTheme(t){
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.innerHTML = (t === 'light') ? '☀️ Light' : '🌙 Dark';
+  localStorage.setItem('fc-theme', t);
+}
+function applyText(large){
+  document.documentElement.classList.toggle('large-text', large);
+  const btn = document.getElementById('textBtn');
+  if (btn) btn.classList.toggle('on', large);
+  localStorage.setItem('fc-large', large ? '1' : '0');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIDEBAR NAV + SEARCH + KEYBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+function makeNavItem(id, cfg, cat){
+  const b = document.createElement('button');
+  b.className = 'nav-item' + (id === curExercise ? ' active' : '');
+  b.dataset.ex = id;
+  b.dataset.search = (cfg.name + ' ' + cat + ' ' + (GYM_SUBCATS[id] || '') + ' ' + cfg.vars.map(v => v.n).join(' ')).toLowerCase();
+  b.innerHTML = `<span class="ic">${ICONS[id]||'•'}</span><span class="nm">${cfg.name}</span><span class="vc">${cfg.vars.length}</span>`;
+  b.addEventListener('click', () => selectExercise(id));
+  return b;
+}
+
+function buildSidebar(){
+  const navEl = document.getElementById('nav');
+  navEl.innerHTML = '';
+  // Group every movement by sub-category; all sections stay visible (no dropdown)
+  const subs = {};
+  Object.entries(EXERCISES).forEach(([id,cfg]) => {
+    const s = GYM_SUBCATS[id] || 'Other';
+    (subs[s] = subs[s] || []).push([id,cfg]);
+  });
+  const order = GYM_SUB_ORDER.filter(s => subs[s])
+    .concat(Object.keys(subs).filter(s => !GYM_SUB_ORDER.includes(s)));
+  order.forEach(s => {
+    const sub = document.createElement('div');
+    sub.className = 'nav-sub';
+    const sh = document.createElement('div');
+    sh.className = 'sub-head static';
+    sh.innerHTML = `<span>${s}</span><span class="nav-count">${subs[s].length}</span>`;
+    sub.appendChild(sh);
+    const slist = document.createElement('div');
+    slist.className = 'sub-list';
+    subs[s].forEach(([id,cfg]) => slist.appendChild(makeNavItem(id, cfg, 'Gym')));
+    sub.appendChild(slist);
+    navEl.appendChild(sub);
+  });
+}
+
+function filterNav(q){
+  q = q.trim().toLowerCase();
+  const navEl = document.getElementById('nav');
+  navEl.querySelectorAll('.nav-item').forEach(item => {
+    item.hidden = !item.dataset.search.includes(q);
+  });
+  // hide empty sub-categories (and auto-expand them while searching)
+  navEl.querySelectorAll('.nav-sub').forEach(sub => {
+    if (q) sub.classList.remove('collapsed');
+    sub.hidden = !sub.querySelector('.nav-item:not([hidden])');
+  });
+  // hide empty top groups (and auto-expand them while searching)
+  navEl.querySelectorAll('.nav-group').forEach(group => {
+    if (q) group.classList.remove('collapsed');
+    group.hidden = !group.querySelector('.nav-item:not([hidden])');
+  });
+  let empty = navEl.querySelector('.nav-empty');
+  const anyVisible = !!navEl.querySelector('.nav-item:not([hidden])');
+  if (!anyVisible){
+    if (!empty){ empty = document.createElement('div'); empty.className = 'nav-empty'; navEl.appendChild(empty); }
+    empty.textContent = `No movements match “${q}”`;
+    empty.hidden = false;
+  } else if (empty){ empty.hidden = true; }
+}
+
+function getVisibleIds(){
+  // offsetParent is null when hidden or inside a collapsed group, so this skips both
+  return Array.from(document.querySelectorAll('.nav-item')).filter(b => b.offsetParent !== null).map(b => b.dataset.ex);
+}
+
+function updateCrumb(){
+  const cfg = EXERCISES[curExercise];
+  const cat = cfg.cat || 'Gym';
+  const sub = (cat === 'Gym') ? GYM_SUBCATS[curExercise] : '';
+  let html = `<span class="ic">${ICONS[curExercise]||'•'}</span><span class="cat">${cat}</span>`;
+  if (sub) html += `<span class="sep">›</span><span class="cat">${sub}</span>`;
+  html += `<span class="sep">›</span><span>${cfg.name}</span>`;
+  document.getElementById('crumb').innerHTML = html;
+}
+
+function setupKeyboard(){
+  document.addEventListener('keydown', e => {
+    const search = document.getElementById('search');
+    const ae = document.activeElement;
+    if (reportOpen){ if (e.key === 'Escape') closeReport(); return; }   // report swallows other keys
+    const guideEl = document.getElementById('guideOverlay');
+    if (guideEl && !guideEl.hidden){ if (e.key === 'Escape') closeGuide(); return; }
+    if (e.key === '/' && ae !== search){ e.preventDefault(); search.focus(); search.select(); return; }
+    if (e.key === 'Escape' && ae === search){ search.value = ''; filterNav(''); search.blur(); return; }
+    if (ae && ae.id === 'varSelect') return;        // let the variation dropdown use arrows itself
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      const ids = getVisibleIds();
+      if (!ids.length) return;
+      e.preventDefault();
+      let idx = ids.indexOf(curExercise);
+      if (idx === -1) idx = 0;
+      else idx = (e.key === 'ArrowDown') ? (idx+1) % ids.length : (idx-1+ids.length) % ids.length;
+      selectExercise(ids[idx]);
+      const el = document.querySelector(`.nav-item[data-ex="${ids[idx]}"]`);
+      if (el) el.scrollIntoView({block:'nearest'});
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP INIT
+// ─────────────────────────────────────────────────────────────────────────────
+async function initApp() {
+  // Restore saved theme / text-size preferences
+  applyTheme(localStorage.getItem('fc-theme') === 'light' ? 'light' : 'dark');
+  applyText(localStorage.getItem('fc-large') === '1');
+
+  // Build searchable sidebar nav (grouped, with icons)
+  buildSidebar();
+  buildVarSelect();
+  updateCrumb();
+  renderStats();
+  document.getElementById('tipText').textContent = EXERCISES[curExercise].tip;
+
+  // Variation select
+  document.getElementById('varSelect').addEventListener('change', e => { curVariation = e.target.value; });
+
+  // Search box filters the sidebar
+  const searchEl = document.getElementById('search');
+  searchEl.addEventListener('input', () => filterNav(searchEl.value));
+
+  // Header buttons: theme + text size
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    applyTheme(localStorage.getItem('fc-theme') === 'light' ? 'dark' : 'light');
+  });
+  document.getElementById('textBtn').addEventListener('click', () => {
+    applyText(!document.documentElement.classList.contains('large-text'));
+  });
+
+  // Reset session stats for the current movement
+  document.getElementById('resetStats').addEventListener('click', () => {
+    delete sessionStats[curExercise]; resetRepState(); renderStats();
+  });
+
+  // Stop Workout → full-page session report
+  document.getElementById('stopBtn').addEventListener('click', openReport);
+
+  // Form Guide → proper vs improper form videos
+  document.getElementById('guideBtn').addEventListener('click', openGuide);
+
+  // Keyboard shortcuts ( / to search, ↑/↓ to switch movement )
+  setupKeyboard();
+
+  // MediaPipe Pose
+  const pose = new Pose({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+  });
+
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    smoothSegmentation: false,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+
+  pose.onResults(onResults);
+
+  // Camera
+  const videoEl = document.getElementById('cam');
+  document.getElementById('loadingMsg').textContent = 'Requesting camera access…';
+
+  const camera = new Camera(videoEl, {
+    onFrame: async () => { await pose.send({ image: videoEl }); },
+    width: 1280,
+    height: 720,
+  });
+
+  try {
+    document.getElementById('loadingMsg').textContent = 'Loading AI pose model…';
+    await camera.start();
+    document.getElementById('statusText').textContent = 'Camera ready';
+  } catch(e) {
+    document.getElementById('loadingMsg').textContent = 'Camera error: ' + e.message;
+    document.getElementById('statusText').textContent = 'Camera error';
+    console.error(e);
+  }
+}
+
+function selectExercise(id) {
+  curExercise  = id;
+  curVariation = EXERCISES[id].vars[0].id;
+  document.querySelectorAll('.nav-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.ex === id);
+  });
+  buildVarSelect();
+  updateCrumb();
+  document.getElementById('tipText').textContent = EXERCISES[id].tip;
+
+  // Clear persisted feedback + rep state so nothing carries over between movements
+  lastFbSig = '';
+  document.getElementById('fbList').innerHTML =
+    `<div class="placeholder">Perform your ${EXERCISES[id].name.toLowerCase()} in frame to receive feedback.</div>`;
+  resetRepState();
+  renderStats();
+}
+
+// (Movement navigation now lives in buildSidebar — the old tab strip was removed.)
+
+function buildVarSelect() {
+  const sel = document.getElementById('varSelect');
+  sel.innerHTML = '';
+  EXERCISES[curExercise].vars.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.id; o.textContent = v.n;
+    o.selected = v.id === curVariation;
+    sel.appendChild(o);
+  });
+}
+
+window.addEventListener('load', initApp);
+</script>
+</body>
+</html>
