@@ -1784,7 +1784,12 @@ function recSupported(){
   return typeof MediaRecorder !== 'undefined' && c && typeof c.captureStream === 'function';
 }
 function recPickMime(){
-  for (const t of ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'])
+  // Safari/iOS records MP4 (H.264), not WebM — prefer MP4 there so files play in Files/Photos.
+  const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+  const webm = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mp4  = ['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4;codecs=h264','video/mp4'];
+  const order = isSafari ? mp4.concat(webm) : webm.concat(mp4);
+  for (const t of order)
     if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
   return '';
 }
