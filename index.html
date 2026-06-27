@@ -314,6 +314,23 @@ header{
 .mann{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:.85rem}
 .guide-note{color:var(--muted);font-size:.72rem;margin-top:1rem;text-align:center}
 @media(max-width:640px){.guide-cols{grid-template-columns:1fr}}
+/* ── Login screen ── */
+.login-screen{position:fixed;inset:0;z-index:120;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:1.5rem;animation:fadeIn .25s ease}
+.login-screen[hidden]{display:none}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:2rem;max-width:380px;width:100%;text-align:center;display:flex;flex-direction:column;gap:.85rem}
+.login-logo{font-size:1.9rem;font-weight:900;letter-spacing:-.5px;color:var(--accent)}
+.login-logo span{color:var(--text)}
+.login-sub{color:var(--muted);font-size:.88rem;line-height:1.5;margin-bottom:.3rem}
+.login-input{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:.7rem .9rem;font-size:.92rem;font-family:inherit;outline:none}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{background:var(--accent);color:#000;border:0;border-radius:9px;padding:.75rem;font-size:.92rem;font-weight:700;cursor:pointer;font-family:inherit}
+.login-btn:hover{filter:brightness(1.08)}
+.login-btn:disabled{opacity:.6;cursor:default}
+.login-status{font-size:.82rem;min-height:1.1em;color:var(--muted);line-height:1.4}
+.login-status.err{color:var(--danger)}
+.login-status.ok{color:var(--accent)}
+.login-skip{background:transparent;border:0;color:var(--muted);font-size:.82rem;cursor:pointer;font-family:inherit;margin-top:.2rem}
+.login-skip:hover{color:var(--text)}
 </style>
 </head>
 <body>
@@ -420,6 +437,18 @@ header{
 <!-- Form-guide modal (proper vs improper form videos) -->
 <div class="modal-overlay" id="guideOverlay" hidden></div>
 
+<!-- Login screen -->
+<div class="login-screen" id="loginScreen" hidden>
+  <div class="login-card">
+    <div class="login-logo">Form<span>Check</span></div>
+    <div class="login-sub">Log in to save your workouts and track your history across devices.</div>
+    <input id="loginEmail" class="login-input" type="email" placeholder="you@example.com" autocomplete="email">
+    <button class="login-btn" id="loginSend">Email me a magic link</button>
+    <div class="login-status" id="loginStatus"></div>
+    <button class="login-skip" id="loginSkip">Continue without an account →</button>
+  </div>
+</div>
+
 <!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -446,9 +475,10 @@ async function cloudInit(){
     sb = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data:{ session } } = await sb.auth.getSession();
     sbUser = session ? session.user : null;
-    sb.auth.onAuthStateChange((_e, s) => { sbUser = s ? s.user : null; updateAccountUI(); });
+    sb.auth.onAuthStateChange((_e, s) => { sbUser = s ? s.user : null; updateAccountUI(); if (sbUser) hideLogin(); });
   } catch(e){ console.error('Supabase init failed:', e); }
   updateAccountUI();
+  if (sb && !sbUser && localStorage.getItem('fc-guest') !== '1') showLogin();   // show login screen on load when signed out
 }
 
 function updateAccountUI(){
@@ -459,13 +489,30 @@ function updateAccountUI(){
   btn.title = sbUser ? 'Click to log out' : 'Log in to save your workouts';
 }
 
-async function cloudLogin(){
-  if (!cloudConfigured()){ alert('Cloud save isn’t set up yet.\n\nAdd your Supabase project URL and anon key near the top of the script, then run the SQL from the README.'); return; }
-  if (sbUser){ if (confirm('Log out of ' + sbUser.email + '?')) await sb.auth.signOut(); return; }
-  const email = (prompt('Enter your email to get a magic sign-in link:') || '').trim();
-  if (!email) return;
+function showLogin(){
+  const s = document.getElementById('loginScreen'); if (!s) return;
+  s.hidden = false;
+  const st = document.getElementById('loginStatus'); if (st){ st.textContent = ''; st.className = 'login-status'; }
+  const el = document.getElementById('loginEmail'); if (el) setTimeout(() => el.focus(), 50);
+}
+function hideLogin(){ const s = document.getElementById('loginScreen'); if (s) s.hidden = true; }
+
+async function loginSendLink(){
+  const st = document.getElementById('loginStatus');
+  if (!cloudConfigured() || !sb){ st.className = 'login-status err'; st.textContent = 'Cloud sign-in isn’t configured.'; return; }
+  const email = (document.getElementById('loginEmail').value || '').trim();
+  if (!/.+@.+\..+/.test(email)){ st.className = 'login-status err'; st.textContent = 'Please enter a valid email address.'; return; }
+  const btn = document.getElementById('loginSend'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Sending…';
   const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] } });
-  alert(error ? ('Sign-in error: ' + error.message) : 'Check your email for a sign-in link, then return to this page.');
+  btn.disabled = false; btn.textContent = old;
+  if (error){ st.className = 'login-status err'; st.textContent = 'Error: ' + error.message; }
+  else { st.className = 'login-status ok'; st.textContent = '✓ Check your email for the sign-in link, then return here.'; }
+}
+
+async function cloudLogin(){
+  if (!cloudConfigured()){ alert('Cloud sign-in isn’t set up yet.'); return; }
+  if (sbUser){ if (confirm('Log out of ' + sbUser.email + '?')) await sb.auth.signOut(); return; }
+  showLogin();
 }
 
 async function cloudSave(){
@@ -2802,9 +2849,12 @@ async function initApp() {
     applyText(!document.documentElement.classList.contains('large-text'));
   });
 
-  // Cloud sync (Supabase): account + history
+  // Cloud sync (Supabase): account + history + login screen
   document.getElementById('accountBtn').addEventListener('click', cloudLogin);
   document.getElementById('historyBtn').addEventListener('click', cloudHistory);
+  document.getElementById('loginSend').addEventListener('click', loginSendLink);
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') loginSendLink(); });
+  document.getElementById('loginSkip').addEventListener('click', () => { localStorage.setItem('fc-guest', '1'); hideLogin(); });
   cloudInit();
 
   // Reset session stats for the current movement
