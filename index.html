@@ -314,6 +314,35 @@ header{
 .mann{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:.85rem}
 .guide-note{color:var(--muted);font-size:.72rem;margin-top:1rem;text-align:center}
 @media(max-width:640px){.guide-cols{grid-template-columns:1fr}}
+/* ── Session builder ── */
+.sb-build{padding:.7rem .7rem 0}
+.build-btn{width:100%;background:var(--accent);color:#000;border:0;border-radius:9px;padding:.6rem;font-size:.85rem;font-weight:800;cursor:pointer;font-family:inherit}
+.build-btn:hover{filter:brightness(1.08)}
+.plan-panel{margin:.6rem .6rem 0;border:1px solid var(--border);border-radius:10px;background:var(--bg2);overflow:hidden;flex-shrink:0}
+.plan-panel[hidden]{display:none}
+.plan-head{display:flex;align-items:center;gap:.4rem;padding:.5rem .6rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent2);border-bottom:1px solid var(--border)}
+.plan-head span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-clear{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:.85rem;font-family:inherit}
+.plan-clear:hover{color:var(--danger)}
+.plan-list{display:flex;flex-direction:column;max-height:34vh;overflow-y:auto}
+.plan-item{display:flex;align-items:center;gap:.5rem;background:transparent;border:0;border-top:1px solid var(--border);color:var(--text);padding:.45rem .6rem;cursor:pointer;font-family:inherit;font-size:.82rem;text-align:left}
+.plan-item:first-child{border-top:0}
+.plan-item:hover{background:var(--hover)}
+.plan-item.active{background:var(--accent);color:#000}
+.pi-n{width:1.1rem;font-size:.7rem;color:var(--muted);flex-shrink:0}
+.plan-item.active .pi-n{color:#000}
+.pi-ic{font-size:.95rem;flex-shrink:0}
+.pi-nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pi-sr{font-size:.66rem;color:var(--muted);flex-shrink:0}
+.plan-item.active .pi-sr{color:#000}
+.survey{display:flex;flex-direction:column}
+.sv-q{font-size:.74rem;font-weight:700;color:var(--muted);margin:.9rem 0 .45rem;text-transform:uppercase;letter-spacing:.5px}
+.sv-opts{display:flex;flex-wrap:wrap;gap:.4rem}
+.sv-opt{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.45rem .75rem;font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .12s}
+.sv-opt:hover{border-color:var(--accent)}
+.sv-opt.sel{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.survey .btn-primary{margin-top:1.3rem}
+
 /* ── Login screen ── */
 .login-screen{position:fixed;inset:0;z-index:120;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:1.5rem;animation:fadeIn .25s ease}
 .login-screen[hidden]{display:none}
@@ -355,6 +384,8 @@ header{
 <div class="layout">
   <!-- SIDEBAR -->
   <aside class="sidebar">
+    <div class="sb-build"><button class="build-btn" id="buildBtn">🎯 Build a Session</button></div>
+    <div class="plan-panel" id="planPanel" hidden></div>
     <div class="search-wrap">
       <input id="search" class="search-box" type="text" placeholder="Search movements…  ( / )" autocomplete="off">
     </div>
@@ -436,6 +467,9 @@ header{
 
 <!-- Form-guide modal (proper vs improper form videos) -->
 <div class="modal-overlay" id="guideOverlay" hidden></div>
+
+<!-- Session builder survey -->
+<div class="modal-overlay" id="planOverlay" hidden></div>
 
 <!-- Login screen -->
 <div class="login-screen" id="loginScreen" hidden>
@@ -1737,6 +1771,7 @@ function drawSkeleton(ctx, lm, w, h, col, missing) {
 // ─────────────────────────────────────────────────────────────────────────────
 let curExercise = 'squat';
 let curVariation = 'standard';
+let currentPlan = null;
 
 function onResults(results) {
   if (reportOpen) return;            // paused while the full-page summary is open
@@ -2717,6 +2752,95 @@ function applyText(large){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SESSION BUILDER (goal survey → generated plan)
+// ─────────────────────────────────────────────────────────────────────────────
+const PLAN_AREAS = [['full','Full Body'],['upper','Upper Body'],['lower','Lower Body'],['arms','Arms'],['push','Push'],['pull','Pull'],['core','Core']];
+const PLAN_POOLS = {                                   // ordered roughly compound → isolation → core
+  full:  ['squat','bench','row','ohp','deadlift','pullup','lunge','plank','curl','situp'],
+  upper: ['bench','row','ohp','pullup','seatedrow','pushup','curl','tricep'],
+  lower: ['squat','deadlift','lunge','bulgarian','glute'],
+  arms:  ['curl','tricep','pullup','seatedrow','bench','ohp'],
+  push:  ['bench','ohp','pushup','tricep'],
+  pull:  ['deadlift','row','pullup','seatedrow','curl'],
+  core:  ['plank','situp','glute'],
+};
+const PLAN_GOALS = {
+  func:     { name:'Functionality', sets:3, reps:'8–12' },
+  aesth:    { name:'Aesthetics',    sets:4, reps:'8–12' },
+  strength: { name:'Strength',      sets:5, reps:'3–6'  },
+  general:  { name:'General',       sets:3, reps:'10–15' },
+};
+const PLAN_LENS = { quick:4, standard:6, full:8 };
+
+function buildSession(area, goalKey, lenKey){
+  const pool = (PLAN_POOLS[area] || PLAN_POOLS.full).filter(id => EXERCISES[id]);
+  const g = PLAN_GOALS[goalKey] || PLAN_GOALS.func;
+  const n = Math.min(PLAN_LENS[lenKey] || 6, pool.length);
+  return {
+    area, goal: goalKey, len: lenKey,
+    areaName: (PLAN_AREAS.find(a => a[0] === area) || [])[1] || 'Full Body',
+    goalName: g.name,
+    items: pool.slice(0, n).map(id => ({ id, sets: g.sets, reps: g.reps })),
+  };
+}
+
+function renderPlan(){
+  const p = document.getElementById('planPanel');
+  if (!p) return;
+  if (!currentPlan){ p.hidden = true; p.innerHTML = ''; return; }
+  p.hidden = false;
+  p.innerHTML =
+    `<div class="plan-head"><span>🎯 ${currentPlan.areaName} · ${currentPlan.goalName}</span>` +
+    `<button class="plan-clear" id="planClear" title="Clear session">✕</button></div>` +
+    `<div class="plan-list">${currentPlan.items.map((it, i) => {
+      const cfg = EXERCISES[it.id]; if (!cfg) return '';
+      return `<button class="plan-item${it.id === curExercise ? ' active' : ''}" data-ex="${it.id}">` +
+        `<span class="pi-n">${i+1}</span><span class="pi-ic">${ICONS[it.id]||'•'}</span>` +
+        `<span class="pi-nm">${cfg.name}</span><span class="pi-sr">${it.sets}×${it.reps}</span></button>`;
+    }).join('')}</div>`;
+  p.querySelectorAll('.plan-item').forEach(b => b.addEventListener('click', () => selectExercise(b.dataset.ex)));
+  document.getElementById('planClear').addEventListener('click', () => {
+    currentPlan = null; localStorage.removeItem('fc-plan'); renderPlan();
+  });
+}
+
+function openSurvey(){
+  const ov = document.getElementById('planOverlay');
+  const sel = currentPlan || { area:'full', goal:'func', len:'standard' };
+  const opts = (arr, cur) => arr.map(([v,n]) => `<button class="sv-opt${v===cur?' sel':''}" data-v="${v}">${n}</button>`).join('');
+  const areaB = opts(PLAN_AREAS, sel.area);
+  const goalB = opts(Object.entries(PLAN_GOALS).map(([v,g]) => [v, g.name]), sel.goal);
+  const lenB  = opts([['quick','Quick · 4'],['standard','Standard · 6'],['full','Full · 8']], sel.len || 'standard');
+  ov.innerHTML = `<div class="modal">
+    <div class="modal-top"><div class="modal-title">🎯 Build a Session</div><button class="modal-close" id="surveyClose">✕</button></div>
+    <div class="survey">
+      <div class="sv-q">1 · What do you want to train?</div>
+      <div class="sv-opts" data-group="area">${areaB}</div>
+      <div class="sv-q">2 · What’s your goal?</div>
+      <div class="sv-opts" data-group="goal">${goalB}</div>
+      <div class="sv-q">3 · Session length</div>
+      <div class="sv-opts" data-group="len">${lenB}</div>
+      <button class="btn btn-primary" id="svBuild">Build my session</button>
+    </div>
+  </div>`;
+  ov.hidden = false;
+  ov.querySelectorAll('.sv-opts').forEach(group => group.querySelectorAll('.sv-opt').forEach(b =>
+    b.addEventListener('click', () => { group.querySelectorAll('.sv-opt').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); })));
+  const close = () => { ov.hidden = true; };
+  document.getElementById('surveyClose').addEventListener('click', close);
+  ov.onclick = e => { if (e.target === ov) close(); };
+  document.getElementById('svBuild').addEventListener('click', () => {
+    const pick = g => { const el = ov.querySelector(`.sv-opts[data-group="${g}"] .sv-opt.sel`); return el ? el.dataset.v : null; };
+    const area = pick('area') || 'full', goal = pick('goal') || 'func', len = pick('len') || 'standard';
+    currentPlan = buildSession(area, goal, len);
+    localStorage.setItem('fc-plan', JSON.stringify({ area, goal, len }));
+    renderPlan();
+    close();
+    if (currentPlan.items[0]) selectExercise(currentPlan.items[0].id);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SIDEBAR NAV + SEARCH + KEYBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 function makeNavItem(id, cfg, cat){
@@ -2802,6 +2926,8 @@ function setupKeyboard(){
     if (reportOpen){ if (e.key === 'Escape') closeReport(); return; }   // report swallows other keys
     const guideEl = document.getElementById('guideOverlay');
     if (guideEl && !guideEl.hidden){ if (e.key === 'Escape') closeGuide(); return; }
+    const planEl = document.getElementById('planOverlay');
+    if (planEl && !planEl.hidden){ if (e.key === 'Escape') planEl.hidden = true; return; }
     if (e.key === '/' && ae !== search){ e.preventDefault(); search.focus(); search.select(); return; }
     if (e.key === 'Escape' && ae === search){ search.value = ''; filterNav(''); search.blur(); return; }
     if (ae && ae.id === 'varSelect') return;        // let the variation dropdown use arrows itself
@@ -2868,6 +2994,12 @@ async function initApp() {
   // Form Guide → proper vs improper form videos
   document.getElementById('guideBtn').addEventListener('click', openGuide);
 
+  // Session builder: restore any saved plan, wire the build button
+  const savedPlan = JSON.parse(localStorage.getItem('fc-plan') || 'null');
+  if (savedPlan && savedPlan.area) currentPlan = buildSession(savedPlan.area, savedPlan.goal, savedPlan.len);
+  renderPlan();
+  document.getElementById('buildBtn').addEventListener('click', openSurvey);
+
   // Keyboard shortcuts ( / to search, ↑/↓ to switch movement )
   setupKeyboard();
 
@@ -2914,6 +3046,7 @@ function selectExercise(id) {
   document.querySelectorAll('.nav-item').forEach(b => {
     b.classList.toggle('active', b.dataset.ex === id);
   });
+  document.querySelectorAll('.plan-item').forEach(b => b.classList.toggle('active', b.dataset.ex === id));
   buildVarSelect();
   updateCrumb();
   document.getElementById('tipText').textContent = EXERCISES[id].tip;
