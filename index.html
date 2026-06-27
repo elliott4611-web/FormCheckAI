@@ -1783,12 +1783,13 @@ function recSupported(){
   const c = document.getElementById('canvas');
   return typeof MediaRecorder !== 'undefined' && c && typeof c.captureStream === 'function';
 }
+const recIsMobile = () => /iphone|ipad|ipod|android/i.test(navigator.userAgent);
 function recPickMime(){
-  // Safari/iOS records MP4 (H.264), not WebM — prefer MP4 there so files play in Files/Photos.
-  const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+  // Phone galleries (Photos / Gallery) want MP4/H.264 — prefer it on mobile so the
+  // video can be saved to the camera roll; WebM stays first on desktop.
   const webm = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
   const mp4  = ['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4;codecs=h264','video/mp4'];
-  const order = isSafari ? mp4.concat(webm) : webm.concat(mp4);
+  const order = recIsMobile() ? mp4.concat(webm) : webm.concat(mp4);
   for (const t of order)
     if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
   return '';
@@ -1843,16 +1844,44 @@ function stopRec(){
 function recSave(){
   if (!recChunks.length) return;
   const type = (recMR && recMR.mimeType) || 'video/webm';
-  const blob = new Blob(recChunks, { type });
   const ext = type.includes('mp4') ? 'mp4' : 'webm';
   const name = EXERCISES[curExercise] ? EXERCISES[curExercise].name.replace(/\s+/g, '-') : 'workout';
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const fname = `FormCheck-${name}-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.${ext}`;
+  const blob = new Blob(recChunks, { type });
+  recChunks = [];
+  let file = null;
+  try { file = new File([blob], fname, { type }); } catch(e){}
+  const canShare = file && navigator.canShare && navigator.canShare({ files: [file] });
+  // On phones, offer the share sheet → "Save Video"/"Save to Gallery" puts it in Photos.
+  if (recIsMobile() && canShare) recShowSave(file, blob, fname);
+  else recDownload(blob, fname);
+}
+
+function recDownload(blob, fname){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `FormCheck-${name}-${stamp}.${ext}`;
+  a.href = url; a.download = fname;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
-  recChunks = [];
+}
+
+function recShowSave(file, blob, fname){
+  const ov = document.getElementById('guideOverlay');
+  ov.innerHTML = `<div class="modal" style="max-width:340px;text-align:center">
+    <div class="modal-top"><div class="modal-title">🎬 Recording ready</div><button class="modal-close" id="saveClose">✕</button></div>
+    <div class="rc-empty" style="margin-bottom:1rem">Tap <b>Save Video</b> / <b>Save to Gallery</b> in the share sheet to add it to your Photos.</div>
+    <button class="btn btn-primary" id="saveShare" style="width:100%">📷 Save to Photos</button>
+    <button id="saveDl" style="background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-family:inherit;font-size:.8rem;margin-top:.8rem">Download to Files instead</button>
+  </div>`;
+  ov.hidden = false;
+  const close = () => { ov.hidden = true; };
+  document.getElementById('saveClose').addEventListener('click', close);
+  ov.onclick = e => { if (e.target === ov) close(); };
+  document.getElementById('saveShare').addEventListener('click', async () => {
+    try { await navigator.share({ files: [file], title: 'FormCheck workout' }); close(); }
+    catch(err){ if (err && err.name !== 'AbortError'){ recDownload(blob, fname); close(); } }
+  });
+  document.getElementById('saveDl').addEventListener('click', () => { recDownload(blob, fname); close(); });
 }
 
 function toggleRec(){ recOn ? stopRec() : startRec(); }
