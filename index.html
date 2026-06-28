@@ -142,8 +142,14 @@ header{
   position:relative;background:var(--card);border-radius:var(--r);
   overflow:hidden;border:1px solid var(--border);flex:1;min-height:0;
 }
-#cam{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
-#canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+#cam{width:100%;height:100%;object-fit:cover;display:block;transform:var(--cam-tf,scaleX(-1));transform-origin:center}
+#canvas{position:absolute;inset:0;width:100%;height:100%;transform:var(--cam-tf,scaleX(-1));transform-origin:center}
+.cam-tools{position:absolute;top:.7rem;right:.7rem;z-index:6;display:flex;gap:.4rem;align-items:center}
+.cam-tool{display:flex;align-items:center;gap:.35rem;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:20px;padding:.34rem .7rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit}
+.cam-tool:hover{border-color:#fff}
+.cam-zoom{display:flex;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.28);border-radius:20px;overflow:hidden}
+.cam-zoom button{background:transparent;border:0;color:#fff;padding:.34rem .6rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit}
+.cam-zoom button.on{background:var(--accent);color:#000}
 .cam-label{
   position:absolute;bottom:.75rem;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.65);backdrop-filter:blur(6px);color:var(--text);
@@ -286,6 +292,22 @@ header{
 .mv-detail{color:var(--muted);font-size:.76rem;margin-top:.1rem}
 .mv-score{font-size:1.25rem;font-weight:800;width:3rem;text-align:right;flex-shrink:0}
 .report-actions{display:flex;gap:.75rem;margin-top:1.5rem;justify-content:center;flex-wrap:wrap}
+/* ── Dashboard ── */
+.dash-toggle{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:1.2rem}
+.dash-toggle button{background:transparent;border:0;color:var(--muted);padding:.55rem 1.1rem;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit}
+.dash-toggle button.on{background:var(--accent);color:#000}
+.dash-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.4rem}
+.dash-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;text-align:center}
+.dash-card .dv{font-size:1.7rem;font-weight:900}
+.dash-card .dl{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:.2rem}
+.dash-chart{display:flex;align-items:flex-end;gap:.4rem;height:170px;padding:.5rem 0 0;overflow-x:auto}
+.dash-bar-wrap{flex:1;min-width:22px;display:flex;flex-direction:column;align-items:center;gap:.35rem;height:100%}
+.dash-bar-track{flex:1;width:100%;display:flex;align-items:flex-end}
+.dash-bar{width:100%;background:var(--accent);border-radius:5px 5px 0 0;min-height:2px;transition:height .3s ease}
+.dash-bar.empty{background:var(--border)}
+.dash-bv{font-size:.68rem;font-weight:700;color:var(--muted)}
+.dash-bl{font-size:.6rem;color:var(--muted);white-space:nowrap;text-align:center}
+.dash-log{display:flex;flex-direction:column}
 .btn{border:0;border-radius:10px;padding:.7rem 1.5rem;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit}
 .btn-primary{background:var(--accent);color:#000}
 .btn-primary:hover{filter:brightness(1.08)}
@@ -375,6 +397,7 @@ header{
     </div>
     <div class="controls">
       <button class="ctrl-btn" id="accountBtn">☁ Log in</button>
+      <button class="ctrl-btn" id="dashBtn">📊 Dashboard</button>
       <button class="ctrl-btn" id="historyBtn">📋 History</button>
       <button class="ctrl-btn" id="themeBtn">🌙 Dark</button>
       <button class="ctrl-btn" id="textBtn">A+ Text</button>
@@ -413,6 +436,12 @@ header{
       <video id="cam" autoplay muted playsinline></video>
       <canvas id="canvas"></canvas>
       <div class="rep-badge" id="repBadge"><div class="rn" id="repNum">0</div><div class="rl" id="repLbl">Reps</div></div>
+      <div class="cam-tools">
+        <div class="cam-zoom" id="camZoom">
+          <button data-z="0.5">0.5×</button><button data-z="1" class="on">1×</button><button data-z="2">2×</button>
+        </div>
+        <button class="cam-tool" id="flipBtn" title="Switch camera">🔄 Flip</button>
+      </div>
       <div class="cam-label" id="camLabel">Stand in frame to begin</div>
     </div>
 
@@ -465,6 +494,9 @@ header{
 
 <!-- Full-page workout summary report -->
 <div class="report-overlay" id="reportOverlay" hidden></div>
+
+<!-- Activity dashboard -->
+<div class="report-overlay" id="dashOverlay" hidden></div>
 
 <!-- Form-guide modal (proper vs improper form videos) -->
 <div class="modal-overlay" id="guideOverlay" hidden></div>
@@ -611,6 +643,105 @@ async function cloudHistory(){
     return `<div class="mv-row"><div style="flex:1;min-width:0"><div class="mv-name">${r.movement}</div><div class="mv-detail">${detail} · ${when}</div></div><div class="mv-score" style="color:${scoreColor(r.avg_score)}">${r.avg_score}</div></div>`;
   }).join('');
   show(rows);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVITY DASHBOARD — daily / weekly / monthly activity + workout log
+// ─────────────────────────────────────────────────────────────────────────────
+let dashRows = [], dashErr = '', dashPeriod = 'daily';
+
+function startOfWeek(d){
+  const x = new Date(d); const day = (x.getDay() + 6) % 7;   // Monday = 0
+  x.setHours(0,0,0,0); x.setDate(x.getDate() - day); return x;
+}
+function rowKey(date, period){
+  const d = new Date(date);
+  if (period === 'daily')  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if (period === 'weekly'){ const s = startOfWeek(d); return `w${s.getFullYear()}-${s.getMonth()}-${s.getDate()}`; }
+  return `m${d.getFullYear()}-${d.getMonth()}`;
+}
+function buildBuckets(period){
+  const now = new Date(); const out = [];
+  if (period === 'daily'){
+    for (let i = 13; i >= 0; i--){ const d = new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate() - i);
+      out.push({ k: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, label: d.toLocaleDateString(undefined,{day:'numeric'}), sub: d.toLocaleDateString(undefined,{month:'short'}) }); }
+  } else if (period === 'weekly'){
+    const sw = startOfWeek(now);
+    for (let i = 11; i >= 0; i--){ const d = new Date(sw); d.setDate(d.getDate() - i*7);
+      out.push({ k: `w${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, label: d.toLocaleDateString(undefined,{day:'numeric'}), sub: d.toLocaleDateString(undefined,{month:'short'}) }); }
+  } else {
+    for (let i = 11; i >= 0; i--){ const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      out.push({ k: `m${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString(undefined,{month:'short'}), sub: String(d.getFullYear()).slice(2) }); }
+  }
+  return out;
+}
+
+async function openDashboard(){
+  if (!cloudConfigured()){ alert('Cloud isn’t configured.'); return; }
+  if (!sbUser){ showLogin(); return; }
+  const ov = document.getElementById('dashOverlay');
+  ov.hidden = false; window.scrollTo(0, 0);
+  ov.innerHTML = `<div class="report-inner"><div class="report-top"><div><div class="report-title">Activity <span>Dashboard</span></div><div class="report-sub">Loading…</div></div><button class="report-close" id="dashClose">✕ Close</button></div></div>`;
+  document.getElementById('dashClose').addEventListener('click', closeDashboard);
+  const { data, error } = await sb.from('sessions').select('*').order('created_at', { ascending:false }).limit(2000);
+  dashRows = error ? [] : (data || []);
+  dashErr = error ? error.message : '';
+  renderDashboard();
+}
+function closeDashboard(){ document.getElementById('dashOverlay').hidden = true; }
+
+function renderDashboard(){
+  const ov = document.getElementById('dashOverlay');
+  const period = dashPeriod;
+  const buckets = buildBuckets(period);
+  const bmap = {};
+  buckets.forEach(b => { b.reps = 0; b.scoreSum = 0; b.scoreN = 0; b.sessions = new Set(); bmap[b.k] = b; });
+  let totReps = 0, scoreSum = 0, scoreN = 0; const allSessions = new Set(), activeDays = new Set();
+  dashRows.forEach(r => {
+    const sid = new Date(r.created_at).toISOString().slice(0,16);   // group rows from one save = one workout
+    activeDays.add(new Date(r.created_at).toDateString());
+    allSessions.add(sid);
+    if (r.avg_score){ scoreSum += r.avg_score; scoreN++; }
+    totReps += r.reps || 0;
+    const b = bmap[rowKey(r.created_at, period)];
+    if (b){ b.reps += r.reps || 0; if (r.avg_score){ b.scoreSum += r.avg_score; b.scoreN++; } b.sessions.add(sid); }
+  });
+  const maxReps = Math.max(1, ...buckets.map(b => b.reps));
+  const avgScore = scoreN ? Math.round(scoreSum / scoreN) : 0;
+  const bars = buckets.map(b => `<div class="dash-bar-wrap">
+      <div class="dash-bv">${b.reps || ''}</div>
+      <div class="dash-bar-track"><div class="dash-bar ${b.reps ? '' : 'empty'}" style="height:${b.reps ? Math.max(3, Math.round(b.reps / maxReps * 100)) : 2}%"></div></div>
+      <div class="dash-bl">${b.label}<br>${b.sub}</div>
+    </div>`).join('');
+  const log = dashRows.slice(0, 50).map(r => {
+    const when = new Date(r.created_at).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+    const detail = r.is_hold ? `${r.hold_s}s hold` : `${r.reps} reps · best ${r.best || '—'}`;
+    return `<div class="mv-row"><div style="flex:1;min-width:0"><div class="mv-name">${r.movement}</div><div class="mv-detail">${detail} · ${when}</div></div><div class="mv-score" style="color:${scoreColor(r.avg_score)}">${r.avg_score}</div></div>`;
+  }).join('');
+  const periodLabel = period === 'daily' ? '14 days' : period === 'weekly' ? '12 weeks' : '12 months';
+  const unit = period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month';
+  ov.innerHTML = `<div class="report-inner">
+    <div class="report-top">
+      <div><div class="report-title">Activity <span>Dashboard</span></div><div class="report-sub">Last ${periodLabel}</div></div>
+      <button class="report-close" id="dashClose">✕ Close</button>
+    </div>
+    ${dashErr ? `<div class="report-card"><div class="rc-empty">Couldn’t load data: ${dashErr}</div></div>` : ''}
+    <div class="dash-toggle" id="dashToggle">
+      <button data-p="daily" class="${period==='daily'?'on':''}">Daily</button>
+      <button data-p="weekly" class="${period==='weekly'?'on':''}">Weekly</button>
+      <button data-p="monthly" class="${period==='monthly'?'on':''}">Monthly</button>
+    </div>
+    <div class="dash-cards">
+      <div class="dash-card"><div class="dv">${allSessions.size}</div><div class="dl">Workouts</div></div>
+      <div class="dash-card"><div class="dv">${activeDays.size}</div><div class="dl">Active Days</div></div>
+      <div class="dash-card"><div class="dv">${totReps}</div><div class="dl">Total Reps</div></div>
+      <div class="dash-card"><div class="dv" style="color:${avgScore ? scoreColor(avgScore) : ''}">${avgScore || '—'}</div><div class="dl">Avg Score</div></div>
+    </div>
+    <div class="report-card"><h3>📈 Reps per ${unit}</h3><div class="dash-chart">${bars}</div></div>
+    <div class="report-card"><h3>📒 Workout log</h3><div class="dash-log">${log || '<div class="rc-empty">No workouts logged yet. Finish a workout and tap “☁ Save workout”.</div>'}</div></div>
+  </div>`;
+  document.getElementById('dashClose').addEventListener('click', closeDashboard);
+  document.querySelectorAll('#dashToggle button').forEach(b => b.addEventListener('click', () => { dashPeriod = b.dataset.p; renderDashboard(); }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1815,9 +1946,10 @@ function recLoop(){
   const v = document.getElementById('cam'), c = document.getElementById('canvas');
   if (v && v.videoWidth){
     const W = recCanvas.width, H = recCanvas.height;
-    recCtx.setTransform(-1, 0, 0, 1, W, 0);    // mirror to match the on-screen selfie view
-    recCtx.drawImage(v, 0, 0, W, H);           // the person
-    recCtx.drawImage(c, 0, 0, W, H);           // skeleton + score overlay (transparent bg)
+    const mir = camFacing === 'user';            // front camera shows a mirrored selfie view
+    recCtx.setTransform(mir ? -1 : 1, 0, 0, 1, mir ? W : 0, 0);
+    recCtx.drawImage(v, 0, 0, W, H);             // the person
+    recCtx.drawImage(c, 0, 0, W, H);             // skeleton + score overlay (transparent bg)
     recCtx.setTransform(1, 0, 0, 1, 0, 0);
   }
   recRAF = requestAnimationFrame(recLoop);
@@ -1872,6 +2004,49 @@ function injectPlayback(){
     <h3>🎥 Your session replay</h3>
     <video class="replay-video" src="${playbackURL}" autoplay loop muted playsinline controls></video>
   </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMERA CONTROLS — flip front/back, digital zoom (0.5× / 1× / 2×)
+// ─────────────────────────────────────────────────────────────────────────────
+let camera = null, poseRef = null, camFacing = 'user', zoomLevel = 1;
+
+function applyCamView(){
+  const mir = camFacing === 'user' ? -1 : 1;     // mirror the selfie (front) view only
+  document.documentElement.style.setProperty('--cam-tf', `scaleX(${mir * zoomLevel}) scaleY(${zoomLevel})`);
+}
+
+function setZoom(z){
+  zoomLevel = z;
+  applyCamView();
+  document.querySelectorAll('#camZoom button').forEach(b => b.classList.toggle('on', parseFloat(b.dataset.z) === z));
+  try { localStorage.setItem('fc-zoom', String(z)); } catch(e){}
+}
+
+async function startCamera(){
+  const videoEl = document.getElementById('cam');
+  camera = new Camera(videoEl, {
+    onFrame: async () => { await poseRef.send({ image: videoEl }); },
+    width: 1280, height: 720, facingMode: camFacing,
+  });
+  try {
+    document.getElementById('loadingMsg').textContent = 'Loading AI pose model…';
+    await camera.start();
+    document.getElementById('statusText').textContent = 'Camera ready';
+  } catch(e){
+    document.getElementById('loadingMsg').textContent = 'Camera error: ' + e.message;
+    document.getElementById('statusText').textContent = 'Camera error';
+    console.error(e);
+  }
+}
+
+async function flipCamera(){
+  camFacing = camFacing === 'user' ? 'environment' : 'user';
+  applyCamView();
+  const v = document.getElementById('cam');
+  if (camera){ try { camera.stop(); } catch(e){} }
+  if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+  await startCamera();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3093,6 +3268,7 @@ async function initApp() {
   // Cloud sync (Supabase): account + history + login screen
   document.getElementById('accountBtn').addEventListener('click', cloudLogin);
   document.getElementById('historyBtn').addEventListener('click', cloudHistory);
+  document.getElementById('dashBtn').addEventListener('click', openDashboard);
   document.getElementById('loginSubmit').addEventListener('click', loginSubmit);
   document.getElementById('loginToggle').addEventListener('click', () => setLoginMode(loginMode === 'signup' ? 'signin' : 'signup'));
   document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') loginSubmit(); });
@@ -3135,25 +3311,14 @@ async function initApp() {
 
   pose.onResults(onResults);
 
-  // Camera
-  const videoEl = document.getElementById('cam');
+  // Camera + controls (flip / zoom)
+  poseRef = pose;
+  const savedZoom = parseFloat(localStorage.getItem('fc-zoom'));
+  setZoom(savedZoom === 0.5 || savedZoom === 2 ? savedZoom : 1);
+  document.getElementById('flipBtn').addEventListener('click', flipCamera);
+  document.querySelectorAll('#camZoom button').forEach(b => b.addEventListener('click', () => setZoom(parseFloat(b.dataset.z))));
   document.getElementById('loadingMsg').textContent = 'Requesting camera access…';
-
-  const camera = new Camera(videoEl, {
-    onFrame: async () => { await pose.send({ image: videoEl }); },
-    width: 1280,
-    height: 720,
-  });
-
-  try {
-    document.getElementById('loadingMsg').textContent = 'Loading AI pose model…';
-    await camera.start();
-    document.getElementById('statusText').textContent = 'Camera ready';
-  } catch(e) {
-    document.getElementById('loadingMsg').textContent = 'Camera error: ' + e.message;
-    document.getElementById('statusText').textContent = 'Camera error';
-    console.error(e);
-  }
+  await startCamera();
 }
 
 function selectExercise(id) {
