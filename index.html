@@ -438,7 +438,7 @@ header{
       <div class="rep-badge" id="repBadge"><div class="rn" id="repNum">0</div><div class="rl" id="repLbl">Reps</div></div>
       <div class="cam-tools">
         <div class="cam-zoom" id="camZoom">
-          <button data-z="0.5">0.5×</button><button data-z="1" class="on">1×</button><button data-z="2">2×</button>
+          <button data-z="1" class="on">1×</button><button data-z="2">2×</button>
         </div>
         <button class="cam-tool" id="flipBtn" title="Switch camera">🔄 Flip</button>
       </div>
@@ -3339,7 +3339,7 @@ async function initApp() {
   // Camera + controls (flip / zoom)
   poseRef = pose;
   const savedZoom = parseFloat(localStorage.getItem('fc-zoom'));
-  setZoom(savedZoom === 0.5 || savedZoom === 2 ? savedZoom : 1);
+  setZoom(savedZoom === 2 ? 2 : 1);
   document.getElementById('flipBtn').addEventListener('click', flipCamera);
   document.querySelectorAll('#camZoom button').forEach(b => b.addEventListener('click', () => setZoom(parseFloat(b.dataset.z))));
   document.getElementById('loadingMsg').textContent = 'Requesting camera access…';
