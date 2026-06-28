@@ -619,8 +619,17 @@ async function cloudSave(){
   }));
   const btn = document.getElementById('btnSaveCloud'); if (btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   const { error } = await sb.from('sessions').insert(rows);
-  if (btn){ btn.disabled = false; btn.textContent = error ? '☁ Retry save' : '✓ Saved'; }
-  if (error) alert('Save failed: ' + error.message);
+  if (btn){ btn.disabled = false; btn.textContent = error ? '☁ Retry save' : '✓ Saved to dashboard'; }
+  if (error){ alert('Save failed: ' + error.message); return; }
+  await refreshDashboard();          // fold the new workout into the daily/weekly/monthly tracker
+}
+
+// Re-pull saved sessions and re-render the dashboard if it's open (called after a save).
+async function refreshDashboard(){
+  if (!sb || !sbUser) return;
+  const { data, error } = await sb.from('sessions').select('*').order('created_at', { ascending:false }).limit(2000);
+  if (!error){ dashRows = data || []; dashErr = ''; }
+  if (!document.getElementById('dashOverlay').hidden) renderDashboard();
 }
 
 async function cloudHistory(){
