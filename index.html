@@ -361,8 +361,6 @@ header{
 .login-btn{background:var(--accent);color:#000;border:0;border-radius:9px;padding:.75rem;font-size:.92rem;font-weight:700;cursor:pointer;font-family:inherit}
 .login-btn:hover{filter:brightness(1.08)}
 .login-btn:disabled{opacity:.6;cursor:default}
-.login-btn.google{background:#fff;color:#1f1f1f;display:flex;align-items:center;justify-content:center;gap:.6rem}
-.login-btn.google svg{flex-shrink:0}
 .login-status{font-size:.82rem;min-height:1.1em;color:var(--muted);line-height:1.4}
 .login-status.err{color:var(--danger)}
 .login-status.ok{color:var(--accent)}
@@ -484,12 +482,12 @@ header{
 <div class="login-screen" id="loginScreen" hidden>
   <div class="login-card">
     <div class="login-logo">Form<span>Check</span></div>
-    <div class="login-sub">Log in to use FormCheck — save your workouts and track your history.</div>
-    <button class="login-btn google" id="loginGoogle">
-      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-      Continue with Google
-    </button>
+    <div class="login-sub" id="loginSub">Log in to use FormCheck — save your workouts and track your history.</div>
+    <input id="loginEmail" class="login-input" type="email" placeholder="Email" autocomplete="email">
+    <input id="loginPass" class="login-input" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="loginSubmit">Log in</button>
     <div class="login-status" id="loginStatus"></div>
+    <button class="login-skip" id="loginToggle">New here? Create an account →</button>
   </div>
 </div>
 
@@ -541,16 +539,41 @@ function showLogin(){
   const s = document.getElementById('loginScreen'); if (!s) return;
   s.hidden = false;
   const st = document.getElementById('loginStatus'); if (st){ st.textContent = ''; st.className = 'login-status'; }
+  setLoginMode('signin');
+  const el = document.getElementById('loginEmail'); if (el) setTimeout(() => el.focus(), 50);
 }
 function hideLogin(){ const s = document.getElementById('loginScreen'); if (s) s.hidden = true; }
 
-async function loginGoogle(){
+let loginMode = 'signin';
+function setLoginMode(mode){
+  loginMode = mode;
+  const signup = mode === 'signup';
+  document.getElementById('loginSub').textContent = signup
+    ? 'Create an account to save your workouts and track your history.'
+    : 'Log in to use FormCheck — save your workouts and track your history.';
+  document.getElementById('loginSubmit').textContent = signup ? 'Sign up' : 'Log in';
+  document.getElementById('loginToggle').textContent = signup ? 'Already have an account? Log in →' : 'New here? Create an account →';
+  document.getElementById('loginPass').autocomplete = signup ? 'new-password' : 'current-password';
+  const st = document.getElementById('loginStatus'); st.textContent = ''; st.className = 'login-status';
+}
+
+async function loginSubmit(){
   const st = document.getElementById('loginStatus');
   if (!cloudConfigured() || !sb){ st.className = 'login-status err'; st.textContent = 'Cloud sign-in isn’t configured.'; return; }
-  const btn = document.getElementById('loginGoogle'); btn.disabled = true;
-  st.className = 'login-status'; st.textContent = 'Redirecting to Google…';
-  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.href.split('#')[0] } });
-  if (error){ btn.disabled = false; st.className = 'login-status err'; st.textContent = 'Error: ' + error.message; }
+  const email = (document.getElementById('loginEmail').value || '').trim();
+  const pass = document.getElementById('loginPass').value || '';
+  if (!/.+@.+\..+/.test(email)){ st.className = 'login-status err'; st.textContent = 'Please enter a valid email address.'; return; }
+  if (pass.length < 6){ st.className = 'login-status err'; st.textContent = 'Password must be at least 6 characters.'; return; }
+  const btn = document.getElementById('loginSubmit'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Please wait…';
+  st.className = 'login-status'; st.textContent = '';
+  const signup = loginMode === 'signup';
+  const { data, error } = signup
+    ? await sb.auth.signUp({ email, password: pass })
+    : await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = old;
+  if (error){ st.className = 'login-status err'; st.textContent = error.message; return; }
+  if (signup && !data.session){ st.className = 'login-status ok'; st.textContent = '✓ Account created — check your email to confirm, then log in.'; return; }
+  // success → onAuthStateChange hides the login screen
 }
 
 async function cloudLogin(){
@@ -3102,7 +3125,10 @@ async function initApp() {
   // Cloud sync (Supabase): account + history + login screen
   document.getElementById('accountBtn').addEventListener('click', cloudLogin);
   document.getElementById('historyBtn').addEventListener('click', cloudHistory);
-  document.getElementById('loginGoogle').addEventListener('click', loginGoogle);
+  document.getElementById('loginSubmit').addEventListener('click', loginSubmit);
+  document.getElementById('loginToggle').addEventListener('click', () => setLoginMode(loginMode === 'signup' ? 'signin' : 'signup'));
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') loginSubmit(); });
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
   cloudInit();
 
   // Reset session stats for the current movement
