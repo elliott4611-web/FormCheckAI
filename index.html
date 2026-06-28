@@ -2011,16 +2011,40 @@ function injectPlayback(){
 // ─────────────────────────────────────────────────────────────────────────────
 let camera = null, poseRef = null, camFacing = 'user', zoomLevel = 1;
 
-function applyCamView(){
-  const mir = camFacing === 'user' ? -1 : 1;     // mirror the selfie (front) view only
-  document.documentElement.style.setProperty('--cam-tf', `scaleX(${mir * zoomLevel}) scaleY(${zoomLevel})`);
+function camTrack(){
+  const v = document.getElementById('cam');
+  const s = v && v.srcObject;
+  return (s && s.getVideoTracks) ? s.getVideoTracks()[0] : null;
+}
+
+// Mirror (front cam) is always CSS; the optional `factor` is only used as a
+// fallback digital zoom when the camera can't reach the requested level natively.
+function setCamTransform(factor){
+  const mir = camFacing === 'user' ? -1 : 1;
+  document.documentElement.style.setProperty('--cam-tf', `scaleX(${mir * factor}) scaleY(${factor})`);
+}
+
+// Zoom the actual camera via the MediaStreamTrack zoom constraint when supported.
+async function applyZoom(){
+  const track = camTrack();
+  let cssFactor = zoomLevel;                 // assume pure-CSS fallback
+  const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+  if (caps && caps.zoom && typeof caps.zoom.max === 'number'){
+    const min = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
+    const native = Math.min(caps.zoom.max, Math.max(min, zoomLevel));
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: native }] });   // real camera zoom
+      cssFactor = zoomLevel / native;        // CSS only covers what optics can't (e.g. 0.5 when min is 1)
+    } catch(e){ cssFactor = zoomLevel; }
+  }
+  setCamTransform(cssFactor);
 }
 
 function setZoom(z){
   zoomLevel = z;
-  applyCamView();
   document.querySelectorAll('#camZoom button').forEach(b => b.classList.toggle('on', parseFloat(b.dataset.z) === z));
   try { localStorage.setItem('fc-zoom', String(z)); } catch(e){}
+  applyZoom();
 }
 
 async function startCamera(){
@@ -2033,6 +2057,7 @@ async function startCamera(){
     document.getElementById('loadingMsg').textContent = 'Loading AI pose model…';
     await camera.start();
     document.getElementById('statusText').textContent = 'Camera ready';
+    applyZoom();                              // apply zoom to the freshly-started track
   } catch(e){
     document.getElementById('loadingMsg').textContent = 'Camera error: ' + e.message;
     document.getElementById('statusText').textContent = 'Camera error';
@@ -2042,7 +2067,7 @@ async function startCamera(){
 
 async function flipCamera(){
   camFacing = camFacing === 'user' ? 'environment' : 'user';
-  applyCamView();
+  setCamTransform(1);                         // update mirror immediately
   const v = document.getElementById('cam');
   if (camera){ try { camera.stop(); } catch(e){} }
   if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
