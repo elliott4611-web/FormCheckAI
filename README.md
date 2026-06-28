@@ -67,6 +67,69 @@ then view your history across devices. It's disabled until you add keys.
 report's **☁ Save workout** button stores it; **📋 History** shows past sessions.
 Magic links don't work from `file://` — use the hosted/localhost URL.
 
+> **Login is required** to use the app once Supabase keys are set.
+
+## Friends & video sharing
+Adds profiles (usernames), friend requests, and sharing recorded videos with
+friends. Run this **once** in the Supabase **SQL editor** (in addition to the
+`sessions` table above):
+
+```sql
+-- Profiles (usernames)
+create table profiles (
+  id uuid primary key references auth.users on delete cascade,
+  username text unique not null,
+  email text,
+  created_at timestamptz default now()
+);
+alter table profiles enable row level security;
+create policy "profiles readable" on profiles for select to authenticated using (true);
+create policy "insert own profile" on profiles for insert to authenticated with check (auth.uid() = id);
+create policy "update own profile" on profiles for update to authenticated using (auth.uid() = id);
+
+-- Friend requests / friendships
+create table friends (
+  id uuid primary key default gen_random_uuid(),
+  requester uuid references auth.users on delete cascade,
+  addressee uuid references auth.users on delete cascade,
+  status text default 'pending',          -- 'pending' | 'accepted'
+  created_at timestamptz default now(),
+  unique (requester, addressee)
+);
+alter table friends enable row level security;
+create policy "see own friendships" on friends for select to authenticated using (auth.uid() = requester or auth.uid() = addressee);
+create policy "send requests"      on friends for insert to authenticated with check (auth.uid() = requester);
+create policy "respond"            on friends for update to authenticated using (auth.uid() = requester or auth.uid() = addressee);
+create policy "remove"             on friends for delete to authenticated using (auth.uid() = requester or auth.uid() = addressee);
+
+-- Shared videos (metadata; the file lives in Storage)
+create table shared_videos (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid references auth.users on delete cascade,
+  recipient uuid references auth.users on delete cascade,
+  path text, movement text,
+  created_at timestamptz default now()
+);
+alter table shared_videos enable row level security;
+create policy "owner or recipient see" on shared_videos for select to authenticated using (auth.uid() = owner or auth.uid() = recipient);
+create policy "owner insert"           on shared_videos for insert to authenticated with check (auth.uid() = owner);
+create policy "owner or recipient del" on shared_videos for delete to authenticated using (auth.uid() = owner or auth.uid() = recipient);
+
+-- Storage bucket for the video files (public read; users upload to their own folder)
+insert into storage.buckets (id, name, public) values ('videos','videos', true) on conflict (id) do nothing;
+create policy "videos public read" on storage.objects for select using (bucket_id = 'videos');
+create policy "videos owner upload" on storage.objects for insert to authenticated
+  with check (bucket_id = 'videos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "videos owner delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'videos' and (storage.foldername(name))[1] = auth.uid()::text);
+```
+
+**Use:** **👥 Friends** (top-right) to add people by **username or email**, accept
+requests, and watch videos shared with you. After recording, the save dialog has
+**👥 Share with a friend** (uploads the clip and shares it). The `videos` bucket
+is public-read (links are unguessable random paths) — switch to signed URLs if
+you want them fully private.
+
 ## Tech
 Vanilla HTML/CSS/JS, MediaPipe Pose (via CDN), Supabase (optional, via CDN), and
 a small canvas-based 3D mannequin renderer — no build step, no install.

@@ -349,6 +349,26 @@ header{
 .sv-opt.sel{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
 .survey .btn-primary{margin-top:1.3rem}
 
+/* ── Friends ── */
+.fr-me{font-size:.82rem;color:var(--muted);margin-bottom:.6rem}
+.fr-add{display:flex;gap:.5rem;margin-bottom:.4rem}
+.fr-add .login-input{flex:1}
+.fr-add .btn{padding:.5rem .9rem}
+.fr-sec{margin-top:1rem}
+.fr-h{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.4rem}
+.fr-row{display:flex;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--border)}
+.fr-row:last-child{border-bottom:0}
+.fr-name{flex:1;font-weight:600;font-size:.88rem}
+.fr-sub{font-size:.72rem;color:var(--muted)}
+.fr-act{display:flex;gap:.4rem;margin-left:auto}
+.fr-btn{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.3rem .6rem;font-size:.74rem;cursor:pointer;font-family:inherit}
+.fr-btn:hover{border-color:var(--accent);color:var(--accent)}
+.fr-btn.ok{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.fr-empty{font-size:.8rem;color:var(--muted);padding:.3rem 0}
+.fr-vid{margin-bottom:.9rem}
+.fr-vh{font-size:.78rem;color:var(--muted);margin-bottom:.3rem}
+.fr-video{width:100%;border-radius:10px;background:#000;max-height:300px}
+
 /* ── Login screen ── */
 .login-screen{position:fixed;inset:0;z-index:120;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:1.5rem;animation:fadeIn .25s ease}
 .login-screen[hidden]{display:none}
@@ -380,6 +400,7 @@ header{
     </div>
     <div class="controls">
       <button class="ctrl-btn" id="accountBtn">☁ Log in</button>
+      <button class="ctrl-btn" id="friendsBtn">👥 Friends</button>
       <button class="ctrl-btn" id="historyBtn">📋 History</button>
       <button class="ctrl-btn" id="themeBtn">🌙 Dark</button>
       <button class="ctrl-btn" id="textBtn">A+ Text</button>
@@ -482,11 +503,10 @@ header{
 <div class="login-screen" id="loginScreen" hidden>
   <div class="login-card">
     <div class="login-logo">Form<span>Check</span></div>
-    <div class="login-sub">Log in to save your workouts and track your history across devices.</div>
+    <div class="login-sub">Log in to use FormCheck — track your workouts, add friends, and share your form videos.</div>
     <input id="loginEmail" class="login-input" type="email" placeholder="you@example.com" autocomplete="email">
     <button class="login-btn" id="loginSend">Email me a magic link</button>
     <div class="login-status" id="loginStatus"></div>
-    <button class="login-skip" id="loginSkip">Continue without an account →</button>
   </div>
 </div>
 
@@ -506,7 +526,7 @@ header{
 // ─────────────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://taitffaszutpafdpywwl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhaXRmZmFzenV0cGFmZHB5d3dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NzEwNTMsImV4cCI6MjA5ODE0NzA1M30.LOBMuYDLO0uenEGuUViCqanH0cv6au7uvXTM05iiwzY';
-let sb = null, sbUser = null;
+let sb = null, sbUser = null, sbProfile = null;
 const cloudConfigured = () => /^https:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
 
 async function cloudInit(){
@@ -516,18 +536,23 @@ async function cloudInit(){
     sb = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data:{ session } } = await sb.auth.getSession();
     sbUser = session ? session.user : null;
-    sb.auth.onAuthStateChange((_e, s) => { sbUser = s ? s.user : null; updateAccountUI(); if (sbUser) hideLogin(); });
+    sb.auth.onAuthStateChange((_e, s) => {
+      sbUser = s ? s.user : null;
+      if (sbUser){ hideLogin(); ensureProfile(); } else { sbProfile = null; showLogin(); }
+      updateAccountUI();
+    });
   } catch(e){ console.error('Supabase init failed:', e); }
   updateAccountUI();
-  if (sb && !sbUser && localStorage.getItem('fc-guest') !== '1') showLogin();   // show login screen on load when signed out
+  if (sb && sbUser) ensureProfile();
+  if (sb && !sbUser) showLogin();   // login is required to use the app
 }
 
 function updateAccountUI(){
   const btn = document.getElementById('accountBtn');
   if (!btn) return;
   if (!cloudConfigured()){ btn.textContent = '☁ Cloud off'; btn.title = 'Add your Supabase URL + anon key in the code to enable cloud save'; return; }
-  btn.textContent = sbUser ? ('☁ ' + (sbUser.email || 'Account')) : '☁ Log in';
-  btn.title = sbUser ? 'Click to log out' : 'Log in to save your workouts';
+  btn.textContent = sbUser ? ('☁ ' + (sbProfile ? '@' + sbProfile.username : (sbUser.email || 'Account'))) : '☁ Log in';
+  btn.title = sbUser ? 'Click to log out' : 'Log in to use FormCheck';
 }
 
 function showLogin(){
@@ -591,6 +616,120 @@ async function cloudHistory(){
     return `<div class="mv-row"><div style="flex:1;min-width:0"><div class="mv-name">${r.movement}</div><div class="mv-detail">${detail} · ${when}</div></div><div class="mv-score" style="color:${scoreColor(r.avg_score)}">${r.avg_score}</div></div>`;
   }).join('');
   show(rows);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOCIAL: profiles (usernames), friends, and shared workout videos
+// ─────────────────────────────────────────────────────────────────────────────
+async function ensureProfile(){
+  if (!sb || !sbUser) return;
+  let r = await sb.from('profiles').select('id,username,email').eq('id', sbUser.id).maybeSingle();
+  if (r.error){ console.warn('profiles not set up:', r.error.message); return; }   // table missing → skip
+  for (let tries = 0; !r.data && tries < 6; tries++){
+    const u = (prompt('Pick a username (3–20 letters, numbers, or _):') || '').trim();
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(u)){ alert('Username must be 3–20 letters, numbers, or _.'); continue; }
+    const ins = await sb.from('profiles').insert({ id: sbUser.id, username: u, email: sbUser.email });
+    if (ins.error){ alert(/duplicate|unique/i.test(ins.error.message) ? 'That username is taken — try another.' : ('Error: ' + ins.error.message)); continue; }
+    r = await sb.from('profiles').select('id,username,email').eq('id', sbUser.id).maybeSingle();
+  }
+  sbProfile = r.data || null;
+  updateAccountUI();
+}
+
+async function findProfile(handle){
+  handle = (handle || '').trim();
+  if (!handle) return null;
+  let r = await sb.from('profiles').select('id,username,email').ilike('username', handle).maybeSingle();
+  if (r.data) return r.data;
+  r = await sb.from('profiles').select('id,username,email').ilike('email', handle).maybeSingle();
+  return r.data || null;
+}
+
+async function profilesByIds(ids){
+  if (!ids.length) return {};
+  const { data } = await sb.from('profiles').select('id,username,email').in('id', ids);
+  const map = {}; (data || []).forEach(p => map[p.id] = p); return map;
+}
+
+async function loadFriendData(){
+  const { data: rows, error } = await sb.from('friends').select('*').or(`requester.eq.${sbUser.id},addressee.eq.${sbUser.id}`);
+  if (error) return { accepted:[], incoming:[], outgoing:[], err: error.message };
+  const list = rows || [];
+  const other = r => r.requester === sbUser.id ? r.addressee : r.requester;
+  const profs = await profilesByIds([...new Set(list.map(other))]);
+  return {
+    accepted: list.filter(r => r.status === 'accepted').map(r => ({ row:r, prof: profs[other(r)] })),
+    incoming: list.filter(r => r.status === 'pending' && r.addressee === sbUser.id).map(r => ({ row:r, prof: profs[r.requester] })),
+    outgoing: list.filter(r => r.status === 'pending' && r.requester === sbUser.id).map(r => ({ row:r, prof: profs[r.addressee] })),
+  };
+}
+
+async function friendAdd(handle){
+  const p = await findProfile(handle);
+  if (!p){ alert('No user found with that username or email.'); return; }
+  if (p.id === sbUser.id){ alert('That’s you!'); return; }
+  const { error } = await sb.from('friends').insert({ requester: sbUser.id, addressee: p.id });
+  alert(error ? (/duplicate|unique/i.test(error.message) ? 'You already have a request or friendship with them.' : ('Error: ' + error.message)) : ('Friend request sent to @' + p.username + '.'));
+  renderFriends();
+}
+async function friendAccept(id){ await sb.from('friends').update({ status:'accepted' }).eq('id', id); renderFriends(); }
+async function friendRemove(id){ await sb.from('friends').delete().eq('id', id); renderFriends(); }
+
+async function sharedWithMeHtml(){
+  const { data, error } = await sb.from('shared_videos').select('*').eq('recipient', sbUser.id).order('created_at', { ascending:false }).limit(30);
+  if (error) return `<div class="fr-empty">Couldn’t load: ${error.message}</div>`;
+  if (!data || !data.length) return '<div class="fr-empty">No videos shared with you yet</div>';
+  const owners = await profilesByIds([...new Set(data.map(r => r.owner))]);
+  return data.map(r => {
+    const url = sb.storage.from('videos').getPublicUrl(r.path).data.publicUrl;
+    const who = owners[r.owner] ? '@' + owners[r.owner].username : 'someone';
+    return `<div class="fr-vid"><div class="fr-vh">${who} · ${r.movement || 'workout'}</div><video src="${url}" controls preload="metadata" class="fr-video"></video></div>`;
+  }).join('');
+}
+
+async function renderFriends(){
+  if (!cloudConfigured()){ alert('Cloud isn’t configured.'); return; }
+  if (!sbUser){ showLogin(); return; }
+  const ov = document.getElementById('guideOverlay');
+  const card = inner => {
+    ov.innerHTML = `<div class="modal"><div class="modal-top"><div class="modal-title">👥 Friends</div><button class="modal-close" id="frClose">✕</button></div>${inner}</div>`;
+    ov.hidden = false;
+    document.getElementById('frClose').addEventListener('click', () => ov.hidden = true);
+    ov.onclick = e => { if (e.target === ov) ov.hidden = true; };
+  };
+  card('<div class="rc-empty">Loading…</div>');
+  const d = await loadFriendData();
+  if (d.err){ card(`<div class="rc-empty">Couldn’t load friends: ${d.err}<br><br>Make sure you’ve run the social SQL from the README.</div>`); return; }
+  const shared = await sharedWithMeHtml();
+  const sec = (title, items, render) => `<div class="fr-sec"><div class="fr-h">${title}</div>${items.length ? items.map(render).join('') : '<div class="fr-empty">None</div>'}</div>`;
+  const me = sbProfile ? `<div class="fr-me">You are <b>@${sbProfile.username}</b></div>` : '';
+  const inner = me +
+    `<div class="fr-add"><input id="frInput" class="login-input" placeholder="Add by username or email" autocomplete="off"><button class="btn btn-primary" id="frAdd">Add</button></div>` +
+    sec('Requests', d.incoming, x => `<div class="fr-row"><span class="fr-name">@${x.prof ? x.prof.username : '?'}</span><span class="fr-act"><button class="fr-btn ok" data-acc="${x.row.id}">Accept</button><button class="fr-btn" data-del="${x.row.id}">Decline</button></span></div>`) +
+    sec('Friends', d.accepted, x => `<div class="fr-row"><span class="fr-name">@${x.prof ? x.prof.username : '?'}</span><button class="fr-btn" data-del="${x.row.id}">Remove</button></div>`) +
+    sec('Pending sent', d.outgoing, x => `<div class="fr-row"><span class="fr-name">@${x.prof ? x.prof.username : '?'}</span><span class="fr-sub">pending</span></div>`) +
+    `<div class="fr-sec"><div class="fr-h">Shared with me</div>${shared}</div>`;
+  card(inner);
+  document.getElementById('frAdd').addEventListener('click', () => { const v = document.getElementById('frInput').value; if (v) friendAdd(v); });
+  document.getElementById('frInput').addEventListener('keydown', e => { if (e.key === 'Enter') friendAdd(e.target.value); });
+  ov.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click', () => friendAccept(b.dataset.acc)));
+  ov.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => friendRemove(b.dataset.del)));
+}
+
+async function shareVideoWithFriend(blob, ext, movement){
+  if (!sbUser){ showLogin(); return; }
+  const d = await loadFriendData();
+  if (d.err){ alert('Set up the social SQL first (see README).'); return; }
+  if (!d.accepted.length){ alert('Add a friend first (👥 Friends) before sharing.'); return; }
+  const names = d.accepted.map((x, i) => `${i+1}. @${x.prof ? x.prof.username : '?'}`).join('\n');
+  const pick = parseInt(prompt('Share with which friend?\n\n' + names + '\n\nEnter the number:'), 10) - 1;
+  if (isNaN(pick) || !d.accepted[pick]) return;
+  const friend = d.accepted[pick].prof;
+  const path = `${sbUser.id}/${Date.now()}.${ext}`;
+  const up = await sb.storage.from('videos').upload(path, blob, { contentType: blob.type, upsert: false });
+  if (up.error){ alert('Upload failed: ' + up.error.message + '\n\n(Did you create the "videos" storage bucket?)'); return; }
+  const { error } = await sb.from('shared_videos').insert({ owner: sbUser.id, recipient: friend.id, path, movement });
+  alert(error ? ('Share failed: ' + error.message) : ('✓ Shared with @' + friend.username + '!'));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1852,9 +1991,7 @@ function recSave(){
   let file = null;
   try { file = new File([blob], fname, { type }); } catch(e){}
   const canShare = file && navigator.canShare && navigator.canShare({ files: [file] });
-  // On phones, offer the share sheet → "Save Video"/"Save to Gallery" puts it in Photos.
-  if (recIsMobile() && canShare) recShowSave(file, blob, fname);
-  else recDownload(blob, fname);
+  recShowSave({ file, blob, fname, ext, movement: name, canShare });
 }
 
 function recDownload(blob, fname){
@@ -1865,23 +2002,28 @@ function recDownload(blob, fname){
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-function recShowSave(file, blob, fname){
+function recShowSave(o){
   const ov = document.getElementById('guideOverlay');
+  const toPhotos = recIsMobile() && o.canShare;
+  const btns =
+    (toPhotos ? `<button class="btn btn-primary" id="saveShare" style="width:100%">📷 Save to Photos</button>` : '') +
+    (sbUser ? `<button class="btn btn-ghost" id="saveFriend" style="width:100%;margin-top:.6rem">👥 Share with a friend</button>` : '') +
+    `<button class="btn btn-ghost" id="saveDl" style="width:100%;margin-top:.6rem">⬇ Download${toPhotos ? ' to Files' : ''}</button>`;
   ov.innerHTML = `<div class="modal" style="max-width:340px;text-align:center">
     <div class="modal-top"><div class="modal-title">🎬 Recording ready</div><button class="modal-close" id="saveClose">✕</button></div>
-    <div class="rc-empty" style="margin-bottom:1rem">Tap <b>Save Video</b> / <b>Save to Gallery</b> in the share sheet to add it to your Photos.</div>
-    <button class="btn btn-primary" id="saveShare" style="width:100%">📷 Save to Photos</button>
-    <button id="saveDl" style="background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-family:inherit;font-size:.8rem;margin-top:.8rem">Download to Files instead</button>
+    ${toPhotos ? '<div class="rc-empty" style="margin-bottom:1rem">Tap <b>Save Video</b> / <b>Save to Gallery</b> in the share sheet to add it to your Photos.</div>' : ''}
+    ${btns}
   </div>`;
   ov.hidden = false;
   const close = () => { ov.hidden = true; };
   document.getElementById('saveClose').addEventListener('click', close);
   ov.onclick = e => { if (e.target === ov) close(); };
-  document.getElementById('saveShare').addEventListener('click', async () => {
-    try { await navigator.share({ files: [file], title: 'FormCheck workout' }); close(); }
-    catch(err){ if (err && err.name !== 'AbortError'){ recDownload(blob, fname); close(); } }
+  const dl = document.getElementById('saveDl'); if (dl) dl.addEventListener('click', () => { recDownload(o.blob, o.fname); close(); });
+  const sh = document.getElementById('saveShare'); if (sh) sh.addEventListener('click', async () => {
+    try { await navigator.share({ files: [o.file], title: 'FormCheck workout' }); close(); }
+    catch(err){ if (err && err.name !== 'AbortError'){ recDownload(o.blob, o.fname); close(); } }
   });
-  document.getElementById('saveDl').addEventListener('click', () => { recDownload(blob, fname); close(); });
+  const fr = document.getElementById('saveFriend'); if (fr) fr.addEventListener('click', () => { close(); shareVideoWithFriend(o.blob, o.ext, o.movement); });
 }
 
 function toggleRec(){ recOn ? stopRec() : startRec(); }
@@ -3098,9 +3240,9 @@ async function initApp() {
   // Cloud sync (Supabase): account + history + login screen
   document.getElementById('accountBtn').addEventListener('click', cloudLogin);
   document.getElementById('historyBtn').addEventListener('click', cloudHistory);
+  document.getElementById('friendsBtn').addEventListener('click', renderFriends);
   document.getElementById('loginSend').addEventListener('click', loginSendLink);
   document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') loginSendLink(); });
-  document.getElementById('loginSkip').addEventListener('click', () => { localStorage.setItem('fc-guest', '1'); hideLogin(); });
   cloudInit();
 
   // Reset session stats for the current movement
