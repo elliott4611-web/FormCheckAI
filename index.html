@@ -179,13 +179,8 @@ header{
 .rep-badge .rn{font-size:1.7rem;font-weight:900;color:var(--accent)}
 .rep-badge .rl{font-size:.56rem;text-transform:uppercase;letter-spacing:1.5px;color:#fff;opacity:.85}
 .rep-badge.pop{animation:repPop .35s ease}
-.rec-btn{position:absolute;top:.7rem;right:.7rem;z-index:6;display:flex;align-items:center;gap:.45rem;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:20px;padding:.38rem .8rem;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit}
-.rec-btn:hover{border-color:#fff}
-.rec-dot{width:10px;height:10px;border-radius:50%;background:#ff4455;flex-shrink:0}
-.rec-btn.on{background:rgba(196,30,52,.7);border-color:#fff}
-.rec-btn.on .rec-dot{animation:recpulse 1s infinite}
-@keyframes recpulse{0%,100%{opacity:1}50%{opacity:.2}}
 @keyframes repPop{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+.replay-video{width:100%;max-height:60vh;border-radius:12px;background:#000;display:block}
 
 /* ── Session stats ── */
 .stat-row{display:flex;gap:.5rem;margin-top:1rem}
@@ -418,7 +413,6 @@ header{
       <video id="cam" autoplay muted playsinline></video>
       <canvas id="canvas"></canvas>
       <div class="rep-badge" id="repBadge"><div class="rn" id="repNum">0</div><div class="rl" id="repLbl">Reps</div></div>
-      <button class="rec-btn" id="recBtn"><span class="rec-dot"></span><span id="recLabel">Record</span></button>
       <div class="cam-label" id="camLabel">Stand in frame to begin</div>
     </div>
 
@@ -1800,27 +1794,21 @@ function drawSkeleton(ctx, lm, w, h, col, missing) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VIDEO RECORDING — capture the feed + skeleton/score overlay, save to device
-// (evaluation is unchanged; this just composites what's already on screen)
+// AUTO SESSION RECORDING — starts itself when the first rep begins, then plays
+// back on a loop in the report when the workout is stopped. Composites the
+// camera feed + skeleton/score overlay (evaluation logic is untouched).
 // ─────────────────────────────────────────────────────────────────────────────
-let recOn = false, recMR = null, recChunks = [], recCanvas = null, recCtx = null, recT0 = 0, recTimer = 0, recRAF = 0;
+let recOn = false, recMR = null, recChunks = [], recCanvas = null, recCtx = null, recRAF = 0, playbackURL = null;
 
-function recSupported(){
+function recAvailable(){
   const c = document.getElementById('canvas');
   return typeof MediaRecorder !== 'undefined' && c && typeof c.captureStream === 'function';
 }
-const recIsMobile = () => /iphone|ipad|ipod|android/i.test(navigator.userAgent);
 function recPickMime(){
-  // Phone galleries (Photos / Gallery) want MP4/H.264 — prefer it on mobile so the
-  // video can be saved to the camera roll; WebM stays first on desktop.
-  const webm = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
-  const mp4  = ['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4;codecs=h264','video/mp4'];
-  const order = recIsMobile() ? mp4.concat(webm) : webm.concat(mp4);
-  for (const t of order)
+  for (const t of ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'])
     if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
   return '';
 }
-function recFmt(ms){ const s = Math.floor(ms/1000); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
 
 function recLoop(){
   if (!recOn) return;
@@ -1835,83 +1823,56 @@ function recLoop(){
   recRAF = requestAnimationFrame(recLoop);
 }
 
-function startRec(){
+// Idempotent: call freely once the person starts moving — only starts once.
+function ensureRecording(){
+  if (recOn || !recAvailable()) return;
   const v = document.getElementById('cam');
-  if (!recSupported() || !v || !v.videoWidth){ alert('Camera isn’t ready yet — give it a moment, then try again.'); return; }
+  if (!v || !v.videoWidth) return;
   recCanvas = document.createElement('canvas');
   recCanvas.width = v.videoWidth; recCanvas.height = v.videoHeight;
   recCtx = recCanvas.getContext('2d');
   let stream;
-  try { stream = recCanvas.captureStream(30); } catch(e){ alert('Recording isn’t supported in this browser.'); return; }
+  try { stream = recCanvas.captureStream(30); } catch(e){ return; }
   const mime = recPickMime();
   try { recMR = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
-  catch(e){ alert('Recording failed to start: ' + e.message); return; }
+  catch(e){ return; }
   recChunks = [];
   recMR.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
-  recMR.onstop = recSave;
+  recMR.onstop = recBuildPlayback;
   recMR.start();
-  recOn = true; recT0 = Date.now();
+  recOn = true;
   recRAF = requestAnimationFrame(recLoop);
-  document.getElementById('recBtn').classList.add('on');
-  const lbl = document.getElementById('recLabel');
-  lbl.textContent = 'Stop · 0:00';
-  recTimer = setInterval(() => { lbl.textContent = 'Stop · ' + recFmt(Date.now() - recT0); }, 250);
 }
 
-function stopRec(){
+function stopRecording(){
   if (!recOn) return;
   recOn = false;
-  clearInterval(recTimer); cancelAnimationFrame(recRAF);
-  try { recMR.stop(); } catch(e){}
-  document.getElementById('recBtn').classList.remove('on');
-  document.getElementById('recLabel').textContent = 'Record';
+  cancelAnimationFrame(recRAF);
+  try { recMR.stop(); } catch(e){}      // → onstop → recBuildPlayback()
 }
 
-function recSave(){
+function clearPlayback(){
+  if (playbackURL){ URL.revokeObjectURL(playbackURL); playbackURL = null; }
+}
+
+function recBuildPlayback(){
+  clearPlayback();
   if (!recChunks.length) return;
-  const type = (recMR && recMR.mimeType) || 'video/webm';
-  const ext = type.includes('mp4') ? 'mp4' : 'webm';
-  const name = EXERCISES[curExercise] ? EXERCISES[curExercise].name.replace(/\s+/g, '-') : 'workout';
-  const fname = `FormCheck-${name}-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.${ext}`;
-  const blob = new Blob(recChunks, { type });
+  const blob = new Blob(recChunks, { type: (recMR && recMR.mimeType) || 'video/webm' });
   recChunks = [];
-  let file = null;
-  try { file = new File([blob], fname, { type }); } catch(e){}
-  const canShare = file && navigator.canShare && navigator.canShare({ files: [file] });
-  recShowSave({ file, blob, fname, ext, movement: name, canShare });
+  playbackURL = URL.createObjectURL(blob);
+  injectPlayback();                     // fill the slot if the report is already showing
 }
 
-function recDownload(blob, fname){
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = fname;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
-
-function recShowSave(o){
-  const ov = document.getElementById('guideOverlay');
-  const toPhotos = recIsMobile() && o.canShare;
-  const btns =
-    (toPhotos ? `<button class="btn btn-primary" id="saveShare" style="width:100%">📷 Save to Photos</button>` : '') +
-    `<button class="btn btn-ghost" id="saveDl" style="width:100%;margin-top:.6rem">⬇ Download${toPhotos ? ' to Files' : ''}</button>`;
-  ov.innerHTML = `<div class="modal" style="max-width:340px;text-align:center">
-    <div class="modal-top"><div class="modal-title">🎬 Recording ready</div><button class="modal-close" id="saveClose">✕</button></div>
-    ${toPhotos ? '<div class="rc-empty" style="margin-bottom:1rem">Tap <b>Save Video</b> / <b>Save to Gallery</b> in the share sheet to add it to your Photos.</div>' : ''}
-    ${btns}
+function injectPlayback(){
+  const slot = document.getElementById('playbackSlot');
+  if (!slot) return;
+  if (!playbackURL){ slot.innerHTML = ''; return; }
+  slot.innerHTML = `<div class="report-card">
+    <h3>🎥 Your session replay</h3>
+    <video class="replay-video" src="${playbackURL}" autoplay loop muted playsinline controls></video>
   </div>`;
-  ov.hidden = false;
-  const close = () => { ov.hidden = true; };
-  document.getElementById('saveClose').addEventListener('click', close);
-  ov.onclick = e => { if (e.target === ov) close(); };
-  const dl = document.getElementById('saveDl'); if (dl) dl.addEventListener('click', () => { recDownload(o.blob, o.fname); close(); });
-  const sh = document.getElementById('saveShare'); if (sh) sh.addEventListener('click', async () => {
-    try { await navigator.share({ files: [o.file], title: 'FormCheck workout' }); close(); }
-    catch(err){ if (err && err.name !== 'AbortError'){ recDownload(o.blob, o.fname); close(); } }
-  });
 }
-
-function toggleRec(){ recOn ? stopRec() : startRec(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POSE HANDLER
@@ -2073,7 +2034,7 @@ function processRep(score, breakdown, lm){
   if (rc.hold){                                   // plank: accumulate good-form time
     if (lastTick){
       const dt = (now - lastTick) / 1000;
-      if (score >= 55){ holdTime += dt; if (holdTime > st.bestHold) st.bestHold = holdTime; }
+      if (score >= 55){ ensureRecording(); holdTime += dt; if (holdTime > st.bestHold) st.bestHold = holdTime; }
       else holdTime = 0;
     }
     lastTick = now;
@@ -2088,6 +2049,7 @@ function processRep(score, breakdown, lm){
   const sig = rc.sig(lm);
   if (sig < rc.lo){                               // at the bottom of the rep
     repArmed = true;
+    ensureRecording();                            // first descent → begin recording the session
     if (sig < repDeepSig){ repDeepSig = sig; repDeepScore = score; repDeepBreakdown = breakdown; }
   } else if (repArmed && sig > rc.hi){            // returned to the top → one rep
     st.reps++; st.sum += repDeepScore;
@@ -2312,6 +2274,8 @@ function renderReport(){
       </div>
     </div>
 
+    <div id="playbackSlot"></div>
+
     <div class="report-card">
       <h3>📋 Per-movement breakdown</h3>
       ${mvRows}
@@ -2324,6 +2288,7 @@ function renderReport(){
     </div>
   </div>`;
   wireReportButtons();
+  injectPlayback();
 }
 
 function wireReportButtons(){
@@ -2335,6 +2300,7 @@ function wireReportButtons(){
 
 function openReport(){
   reportOpen = true; lastTick = 0;
+  stopRecording();                 // finalize the clip → onstop builds the looping replay
   renderReport();
   document.getElementById('reportOverlay').hidden = false;
   window.scrollTo(0, 0);
@@ -2346,6 +2312,8 @@ function closeReport(){
 function newSession(){
   Object.keys(sessionStats).forEach(k => delete sessionStats[k]);
   resetRepState();
+  stopRecording();
+  clearPlayback();
   sessionStart = performance.now();
   closeReport();
   renderStats();
@@ -3141,10 +3109,6 @@ async function initApp() {
 
   // Form Guide → proper vs improper form videos
   document.getElementById('guideBtn').addEventListener('click', openGuide);
-
-  // Record button (capture feed + overlay → download)
-  const recBtn = document.getElementById('recBtn');
-  if (recSupported()) recBtn.addEventListener('click', toggleRec); else recBtn.style.display = 'none';
 
   // Session builder: restore any saved plan, wire the build button
   const savedPlan = JSON.parse(localStorage.getItem('fc-plan') || 'null');
